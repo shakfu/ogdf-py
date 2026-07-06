@@ -538,7 +538,7 @@
 <h3 id="from-pypi">From PyPI<a class="headerlink" href="#from-pypi" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>ogdf-py
 </code></pre></div>
-<p>Wheels are available for Linux (x86_64, aarch64) and macOS (x86_64, arm64) on CPython 3.10-3.13. On other platforms pip falls back to the source distribution, which builds OGDF from source at install time (needs <code>git</code>, a C++17 compiler, and network access; Windows source builds are not supported).</p>
+<p>Wheels are available for Linux (x86_64, aarch64), macOS (x86_64, arm64), and Windows (AMD64) on CPython 3.10-3.14. On platforms without a matching wheel, pip falls back to the source distribution, which builds OGDF from source at install time; this needs <code>git</code>, a C++17 compiler (MSVC works), CMake, and network access.</p>
 <h3 id="from-source">From source<a class="headerlink" href="#from-source" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/shakfu/ogdf-py
 <span class="nb">cd</span><span class="w"> </span>ogdf-py
