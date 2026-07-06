@@ -37,6 +37,8 @@ using namespace nb::literals;
 // NaNs). Seed distinct positions on a circle when no initial layout is present,
 // while leaving any user-provided layout untouched.
 static void seed_circle_if_degenerate(GraphAttributes& ga) {
+    // M_PI is non-standard and undefined on MSVC, so use an explicit constant.
+    constexpr double kPi = 3.14159265358979323846;
     const Graph& g = ga.constGraph();
     for (node v : g.nodes) {
         if (ga.x(v) != 0.0 || ga.y(v) != 0.0) {
@@ -50,7 +52,7 @@ static void seed_circle_if_degenerate(GraphAttributes& ga) {
     const double radius = 10.0 * n;
     int i = 0;
     for (node v : g.nodes) {
-        const double angle = 2.0 * M_PI * i / n;
+        const double angle = 2.0 * kPi * i / n;
         ga.x(v) = radius * std::cos(angle);
         ga.y(v) = radius * std::sin(angle);
         ++i;

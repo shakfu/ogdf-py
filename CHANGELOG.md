@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Removed the persistent CMake `build-dir` from `pyproject.toml`. Sharing it between editable installs and wheel builds could leave stale objects, so a `uv build --wheel` sometimes omitted recently-added functions. Each build now uses a fresh directory (OGDF is prebuilt, so this stays fast).
 
+- MSVC build: replaced the non-standard `M_PI` (undefined on MSVC) with an explicit constant so the extension compiles on Windows.
+
 ## [0.1.1]
 
 ### Added
