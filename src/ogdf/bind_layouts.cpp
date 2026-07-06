@@ -3,21 +3,31 @@
 #include "bindings.h"
 
 #include <cmath>
+#include <stdexcept>
 
 #include <ogdf/basic/GraphAttributes.h>
 #include <ogdf/basic/geometry.h>
+#include <ogdf/basic/simple_graph_alg.h>
 #include <ogdf/energybased/FMMMLayout.h>
 #include <ogdf/energybased/GEMLayout.h>
+#include <ogdf/energybased/MultilevelLayout.h>
 #include <ogdf/energybased/PivotMDS.h>
 #include <ogdf/energybased/SpringEmbedderKK.h>
 #include <ogdf/energybased/StressMinimization.h>
+#include <ogdf/energybased/TutteLayout.h>
 #include <ogdf/energybased/fmmm/FMMMOptions.h>
+#include <ogdf/energybased/multilevel_mixer/ModularMultilevelMixer.h>
 #include <ogdf/layered/SugiyamaLayout.h>
+#include <ogdf/misclayout/BalloonLayout.h>
 #include <ogdf/misclayout/CircularLayout.h>
+#include <ogdf/misclayout/LinearLayout.h>
 #include <ogdf/orthogonal/OrthoLayout.h>
 #include <ogdf/planarity/PlanarizationLayout.h>
 #include <ogdf/planarlayout/SchnyderLayout.h>
+#include <ogdf/tree/RadialTreeLayout.h>
 #include <ogdf/tree/TreeLayout.h>
+#include <ogdf/upward/DominanceLayout.h>
+#include <ogdf/upward/VisibilityLayout.h>
 
 using namespace ogdf;
 using namespace nb::literals;
@@ -219,4 +229,102 @@ void register_layouts(nb::module_& m) {
              "graph_attributes"_a,
              "Compute a Schnyder straight-line planar grid layout (requires a "
              "simple planar graph with at least 3 nodes).");
+
+    // Radial tree drawing (concentric levels). Requires a tree.
+    nb::enum_<RadialTreeLayout::RootSelectionType>(m, "RadialRootSelection")
+        .value("SOURCE", RadialTreeLayout::RootSelectionType::Source)
+        .value("SINK", RadialTreeLayout::RootSelectionType::Sink)
+        .value("CENTER", RadialTreeLayout::RootSelectionType::Center);
+
+    nb::class_<RadialTreeLayout>(m, "RadialTreeLayout")
+        .def(nb::init<>())
+        .def("call", [](RadialTreeLayout& l, GraphAttributes& g) { l.call(g); },
+             "graph_attributes"_a,
+             "Compute a radial tree layout (requires a tree).")
+        .def("set_level_distance",
+             [](RadialTreeLayout& l, double x) { l.levelDistance(x); },
+             "value"_a)
+        .def("set_root_selection",
+             [](RadialTreeLayout& l, RadialTreeLayout::RootSelectionType r) {
+                 l.rootSelection(r);
+             },
+             "selection"_a);
+
+    // Arc diagram: nodes on a line, edges drawn as semicircular arcs.
+    nb::class_<LinearLayout>(m, "LinearLayout")
+        .def(nb::init<>())
+        .def("call", [](LinearLayout& l, GraphAttributes& g) { l.call(g); },
+             "graph_attributes"_a,
+             "Compute a linear (arc-diagram) layout.");
+
+    // Tutte barycentric embedding: convex straight-line planar drawing.
+    // Requires a triconnected (planar) graph.
+    nb::class_<TutteLayout>(m, "TutteLayout")
+        .def(nb::init<>())
+        .def("call", [](TutteLayout& l, GraphAttributes& g) { l.call(g); },
+             "graph_attributes"_a,
+             "Compute a Tutte barycentric convex planar layout (requires a "
+             "triconnected planar graph).");
+
+    // Upward drawings for directed acyclic graphs. Both internally planarize
+    // the input to an upward-planar representation.
+    nb::class_<DominanceLayout>(m, "DominanceLayout")
+        .def(nb::init<>())
+        .def("call", [](DominanceLayout& l, GraphAttributes& g) { l.call(g); },
+             "graph_attributes"_a,
+             "Compute an upward dominance drawing (for a DAG).")
+        .def("set_min_grid_distance",
+             [](DominanceLayout& l, int d) { l.setMinGridDistance(d); },
+             "value"_a);
+
+    nb::class_<VisibilityLayout>(m, "VisibilityLayout")
+        .def(nb::init<>())
+        .def("call", [](VisibilityLayout& l, GraphAttributes& g) { l.call(g); },
+             "graph_attributes"_a,
+             "Compute an upward visibility drawing (for a DAG).")
+        .def("set_min_grid_distance",
+             [](VisibilityLayout& l, int d) { l.setMinGridDistance(d); },
+             "value"_a);
+
+    // Multilevel force-directed layout for large graphs. The default
+    // constructor installs a complete pipeline (coarsening + placement +
+    // single-level layout) and handles disconnected graphs.
+    nb::class_<MultilevelLayout>(m, "MultilevelLayout")
+        .def(nb::init<>())
+        .def("call", [](MultilevelLayout& l, GraphAttributes& g) { l.call(g); },
+             "graph_attributes"_a,
+             "Compute a multilevel force-directed layout (suited to large "
+             "graphs).");
+
+    // The multilevel mixer engine (used inside MultilevelLayout). Works with
+    // defaults, but does not split disconnected components.
+    nb::class_<ModularMultilevelMixer>(m, "ModularMultilevelMixer")
+        .def(nb::init<>())
+        .def("call",
+             [](ModularMultilevelMixer& l, GraphAttributes& g) { l.call(g); },
+             "graph_attributes"_a,
+             "Compute a multilevel layout via the modular mixer.")
+        .def("set_layout_repeats",
+             [](ModularMultilevelMixer& l, int n) { l.setLayoutRepeats(n); },
+             "n"_a)
+        .def("set_all_edge_lengths",
+             [](ModularMultilevelMixer& l, double x) { l.setAllEdgeLengths(x); },
+             "value"_a);
+
+    // Balloon layout: subtrees drawn in enclosing circles. Requires a
+    // connected graph (a spanning tree is computed internally).
+    nb::class_<BalloonLayout>(m, "BalloonLayout")
+        .def(nb::init<>())
+        .def("call",
+             [](BalloonLayout& l, GraphAttributes& g) {
+                 if (!isConnected(g.constGraph())) {
+                     throw std::invalid_argument(
+                         "BalloonLayout requires a connected graph");
+                 }
+                 l.call(g);
+             },
+             "graph_attributes"_a,
+             "Compute a balloon layout (requires a connected graph).")
+        .def("set_even_angles",
+             [](BalloonLayout& l, bool b) { l.setEvenAngles(b); }, "value"_a);
 }

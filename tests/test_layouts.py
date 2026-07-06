@@ -68,3 +68,73 @@ def test_layout_configuration_setters():
     layout.set_edge_costs(100.0)
     layout.call(ga)
     assert ga.bounding_box_width() > 0
+
+
+# --- Tier 1 layouts (each has a precondition) --- #
+def test_radial_tree_layout():
+    g = ogdf.Graph()
+    ogdf.random_tree(g, 20)  # requires a tree
+    ga = ogdf.GraphAttributes(g)
+    ogdf.RadialTreeLayout().call(ga)
+    assert ga.bounding_box_width() > 0
+
+
+def test_linear_layout():
+    g = connected_graph()
+    ga = ogdf.GraphAttributes(g)
+    ogdf.LinearLayout().call(ga)
+    # An arc diagram places nodes along a line -> constant y.
+    ys = {round(ga.y(v), 3) for v in g.nodes()}
+    assert len(ys) == 1
+
+
+def test_tutte_layout():
+    g = ogdf.Graph()
+    ogdf.cube_graph(g, 3)  # 3-connected planar
+    nodes = list(g.nodes())
+    ga = ogdf.GraphAttributes(g)
+    ogdf.TutteLayout().call(ga)
+    coords = {(round(ga.x(v), 3), round(ga.y(v), 3)) for v in nodes}
+    assert len(coords) == len(nodes)
+
+
+def _dag(n):
+    g = ogdf.Graph()
+    nodes = [g.new_node() for _ in range(n)]
+    for i in range(n - 1):
+        g.new_edge(nodes[i], nodes[i + 1])
+    g.new_edge(nodes[0], nodes[n - 1])
+    return g
+
+
+@pytest.mark.parametrize("layout_cls", [ogdf.DominanceLayout, ogdf.VisibilityLayout])
+def test_upward_layouts(layout_cls):
+    g = _dag(6)  # directed acyclic graph
+    ga = ogdf.GraphAttributes(g)
+    layout_cls().call(ga)
+    assert ga.bounding_box_width() > 0
+    assert ga.bounding_box_height() > 0
+
+
+# --- Tier 2 layouts --- #
+@pytest.mark.parametrize(
+    "layout_cls",
+    [ogdf.MultilevelLayout, ogdf.ModularMultilevelMixer, ogdf.BalloonLayout],
+)
+def test_tier2_layouts(layout_cls):
+    g = connected_graph(25, 35)
+    nodes = list(g.nodes())
+    ga = ogdf.GraphAttributes(g)
+    layout_cls().call(ga)
+    coords = [(ga.x(v), ga.y(v)) for v in nodes]
+    assert all(x == x and y == y for x, y in coords)  # no NaNs
+    assert len({(round(x, 2), round(y, 2)) for x, y in coords}) > 1
+
+
+def test_balloon_rejects_disconnected():
+    g = ogdf.Graph()
+    g.new_node()
+    g.new_node()  # two isolated nodes -> disconnected
+    ga = ogdf.GraphAttributes(g)
+    with pytest.raises(ValueError):
+        ogdf.BalloonLayout().call(ga)

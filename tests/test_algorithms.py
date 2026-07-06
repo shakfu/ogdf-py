@@ -187,3 +187,178 @@ def test_coloring_bipartite_uses_two():
     g = cycle(6)[0]  # bipartite -> 2 colors
     colors = ogdf.NodeArrayInt(g)
     assert ogdf.node_coloring(g, colors) == 2
+
+
+# --- cut vertices and bridges --- #
+def test_cut_vertices_and_bridges_path():
+    g, nodes = path(4)  # a-b-c-d
+    cut = {v.index for v in ogdf.cut_vertices(g)}
+    assert cut == {1, 2}  # the two middle nodes
+    assert len(ogdf.bridges(g)) == 3  # every edge is a bridge
+
+
+def test_no_cut_vertices_in_cycle():
+    c, _ = cycle(4)
+    assert len(ogdf.cut_vertices(c)) == 0
+    assert len(ogdf.bridges(c)) == 0
+
+
+# --- Bellman-Ford --- #
+def test_bellman_ford_negative_edge():
+    g = ogdf.Graph()
+    a, b, c = g.new_node(), g.new_node(), g.new_node()
+    e1 = g.new_edge(a, b)
+    e2 = g.new_edge(b, c)
+    e3 = g.new_edge(a, c)
+    length = ogdf.EdgeArrayInt(g)
+    length[e1], length[e2], length[e3] = 4, -2, 5
+    dist = ogdf.NodeArrayInt(g)
+    assert ogdf.bellman_ford(g, a, length, dist)  # no negative cycle
+    assert dist[c] == 2  # a->b->c (4-2) beats a->c (5)
+
+
+# --- maximum-weight matching --- #
+def test_maximum_weight_matching():
+    g = ogdf.Graph()
+    m = [g.new_node() for _ in range(4)]
+    e0 = g.new_edge(m[0], m[1])
+    e1 = g.new_edge(m[2], m[3])
+    e2 = g.new_edge(m[1], m[2])
+    weight = ogdf.EdgeArrayDouble(g)
+    weight[e0], weight[e1], weight[e2] = 3.0, 3.0, 5.0
+    matching = ogdf.EdgeArrayBool(g)
+    total = ogdf.maximum_weight_matching(g, weight, matching)
+    # Two disjoint edges (3 + 3) beat the single heavy edge (5).
+    assert total == 6.0
+    assert matching[e0] and matching[e1] and not matching[e2]
+
+
+# --- min-cost flow --- #
+def test_min_cost_flow():
+    g = ogdf.Graph()
+    s, a, t = g.new_node(), g.new_node(), g.new_node()
+    e1 = g.new_edge(s, a)
+    e2 = g.new_edge(a, t)
+    e3 = g.new_edge(s, t)
+    lower = ogdf.EdgeArrayInt(g, 0)
+    upper = ogdf.EdgeArrayInt(g)
+    upper[e1], upper[e2], upper[e3] = 2, 2, 2
+    cost = ogdf.EdgeArrayDouble(g)
+    cost[e1], cost[e2], cost[e3] = 1.0, 1.0, 5.0
+    supply = ogdf.NodeArrayInt(g)
+    supply[s], supply[a], supply[t] = 2, 0, -2
+    flow = ogdf.EdgeArrayInt(g)
+    assert ogdf.min_cost_flow(g, lower, upper, cost, supply, flow)
+    # Route the 2 units through a (cost 1+1) rather than direct (cost 5).
+    assert flow[e1] == 2 and flow[e2] == 2 and flow[e3] == 0
+
+
+# --- Steiner tree --- #
+def test_steiner_tree_path():
+    g, nodes = path(4)  # a-b-c-d
+    weight = ogdf.EdgeArrayDouble(g, 1.0)
+    total, edges = ogdf.steiner_tree(g, weight, [nodes[0], nodes[3]])
+    # Connecting the two ends requires the whole path.
+    assert total == 3.0
+    assert len(edges) == 3
+
+
+def test_steiner_tree_star():
+    g = ogdf.Graph()
+    center = g.new_node()
+    leaves = [g.new_node() for _ in range(4)]
+    for leaf in leaves:
+        g.new_edge(center, leaf)
+    weight = ogdf.EdgeArrayDouble(g, 2.0)
+    total, edges = ogdf.steiner_tree(g, weight, leaves)
+    # All four spokes are needed to connect the leaves.
+    assert total == 8.0
+    assert len(edges) == 4
+
+
+# --- maximal planar subgraph --- #
+def test_maximal_planar_subgraph_of_k5():
+    k5 = ogdf.Graph()
+    ogdf.complete_graph(k5, 5)  # non-planar; needs exactly one edge removed
+    removed = ogdf.maximal_planar_subgraph(k5)
+    assert len(removed) == 1  # 10 - 1 = 9 = 3*5 - 6 (maximal planar)
+
+    # Rebuild the subgraph without the removed edges and confirm it is planar.
+    removed_idx = {e.index for e in removed}
+    sub = ogdf.Graph()
+    nodes = [sub.new_node() for _ in range(k5.number_of_nodes())]
+    for e in k5.edges():
+        if e.index not in removed_idx:
+            sub.new_edge(nodes[e.source.index], nodes[e.target.index])
+    assert ogdf.is_planar(sub)
+
+
+def test_maximal_planar_subgraph_already_planar():
+    g = ogdf.Graph()
+    ogdf.random_planar_connected_graph(g, 12, 18)
+    assert len(ogdf.maximal_planar_subgraph(g)) == 0
+
+
+# --- triconnectivity / SPQR --- #
+def test_separation_pair():
+    c, _ = cycle(6)  # biconnected, not triconnected
+    sp = ogdf.separation_pair(c)
+    assert sp is not None
+    assert sp[0].index != sp[1].index
+
+    k4 = ogdf.Graph()
+    ogdf.complete_graph(k4, 4)  # triconnected -> no separation pair
+    assert ogdf.separation_pair(k4) is None
+
+
+def test_spqr_tree_summary():
+    c, _ = cycle(6)  # a cycle is a single series (S) node
+    assert ogdf.spqr_tree_summary(c) == {"S": 1, "P": 0, "R": 0, "nodes": 1}
+
+    k4 = ogdf.Graph()
+    ogdf.complete_graph(k4, 4)  # triconnected -> a single rigid (R) node
+    assert ogdf.spqr_tree_summary(k4)["R"] == 1
+
+
+def test_spqr_requires_biconnected():
+    g, _ = path(4)  # not biconnected
+    with pytest.raises(ValueError):
+        ogdf.spqr_tree_summary(g)
+
+
+# --- optional predicates --- #
+def test_is_two_edge_connected():
+    assert ogdf.is_two_edge_connected(cycle(4)[0])  # bridgeless
+    assert not ogdf.is_two_edge_connected(path(4)[0])  # every edge a bridge
+
+
+def test_is_regular():
+    c, _ = cycle(5)  # every node has degree 2
+    assert ogdf.is_regular(c)
+    assert ogdf.is_regular(c, 2)
+    assert not ogdf.is_regular(c, 3)
+
+
+def test_is_arborescence():
+    g = ogdf.Graph()
+    root = g.new_node()
+    for _ in range(3):
+        g.new_edge(root, g.new_node())  # directed rooted tree
+    assert ogdf.is_arborescence(g)
+    assert not ogdf.is_arborescence(cycle(4)[0])
+
+
+def test_triangulate():
+    g = ogdf.Graph()
+    ogdf.random_planar_connected_graph(g, 10, 15)
+    ogdf.planar_embed(g)
+    ogdf.triangulate(g)
+    assert g.number_of_edges() == 3 * 10 - 6  # maximal planar
+    assert ogdf.is_planar(g)
+
+
+def test_bfs_distances():
+    g, nodes = path(5)
+    dist = ogdf.NodeArrayInt(g)
+    ogdf.bfs_distances(g, nodes[0], dist)
+    assert [dist[v] for v in nodes] == [0, 1, 2, 3, 4]

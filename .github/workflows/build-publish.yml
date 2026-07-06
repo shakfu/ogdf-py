@@ -30,8 +30,8 @@ env:
   # this runs inside the manylinux container (git present; install cmake).
   CIBW_BEFORE_ALL_LINUX: >-
     (command -v cmake >/dev/null 2>&1 || pipx install cmake) &&
-    bash scripts/bootstrap_ogdf.sh
-  CIBW_BEFORE_ALL_MACOS: bash scripts/bootstrap_ogdf.sh
+    python3 scripts/bootstrap_ogdf.py
+  CIBW_BEFORE_ALL_MACOS: python3 scripts/bootstrap_ogdf.py
   # Exercise each wheel end-to-end (import + layouts + I/O).
   CIBW_TEST_REQUIRES: pytest
   CIBW_TEST_COMMAND: pytest {project}/tests -v
@@ -85,7 +85,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: thirdparty/ogdf
-          key: ogdf-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.sh') }}
+          key: ogdf-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py') }}
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v4.1.0

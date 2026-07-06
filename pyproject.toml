@@ -1,6 +1,6 @@
 [project]
 name = "ogdf-py"
-version = "0.1.1"
+version = "0.2.0"
 description = "Python bindings for the Open Graph Drawing Framework (OGDF), built with nanobind."
 readme = "README.md"
 license = { text = "MIT" }
@@ -29,6 +29,9 @@ dev = [
     "ruff>=0.15.20",
     "twine>=6.2.0",
 ]
+docs = [
+    "mkdocs-material>=9.5.0",
+]
 
 [build-system]
 requires = ["scikit-build-core>=0.12.2", "nanobind"]
@@ -40,9 +43,11 @@ cmake.args = []
 cmake.define = {}
 cmake.build-type = "Release"
 cmake.source-dir = "."
-# Persist the CMake build tree so the CMake configure and _core.cpp objects are
-# cached across rebuilds. OGDF itself is prebuilt by scripts/bootstrap_ogdf.sh.
-build-dir = "build/{wheel_tag}"
+# No persistent build-dir: OGDF is prebuilt by scripts/bootstrap_ogdf.py, so an
+# extension build only compiles the small binding sources. Using a fresh build
+# directory each time avoids stale-artifact divergence between editable installs
+# and wheel builds (which previously could drop recently-added functions from
+# the wheel).
 sdist.include = []
 sdist.exclude = []
 # Don't ship the C++ source inside the binary wheel.

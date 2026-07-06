@@ -20,12 +20,15 @@ uv run python demos/layouts_gallery.py
 
 - **`layouts_gallery.py`** - renders graphs with every layout algorithm
   (Sugiyama, FMMM, GEM, Kamada-Kawai, stress minimization, pivot MDS, Schnyder,
-  circular, tree, and orthogonal), one SVG per layout.
+  circular, tree, radial tree, linear/arc, Tutte, dominance, visibility, and
+  orthogonal), one SVG per layout.
 - **`styling_showcase.py`** - a wheel graph styled with per-degree node colors,
   ellipse shapes, sizes, labels, and edge arrows.
 - **`algorithms_visual.py`** - visualizes algorithm results by coloring:
   connected components, a proper node coloring, shortest-path distances (as a
-  gradient), and a highlighted minimum spanning tree.
+  gradient), a minimum spanning tree, cut vertices and bridges, a maximum-weight
+  matching, Bellman-Ford distances, a minimum-cost flow (edge width by flow),
+  and a minimum Steiner tree.
 - **`generators_zoo.py`** - builds a variety of named graphs (complete,
   bipartite, wheel, cube, grid, Petersen, trees, random regular) and draws each.
 - **`io_roundtrip.py`** - writes a graph to GML, GraphML, DOT, GEXF, TLP, SVG,

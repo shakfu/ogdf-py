@@ -1,0 +1,39 @@
+site_name: ogdf-py
+site_description: Python bindings for the Open Graph Drawing Framework (OGDF)
+repo_url: https://github.com/shakfu/ogdf-py
+repo_name: shakfu/ogdf-py
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.top
+    - content.code.copy
+    - toc.integrate
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Coverage: coverage.md
+  - Gallery: gallery.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true

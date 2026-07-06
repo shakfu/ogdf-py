@@ -4,7 +4,7 @@
 # This Makefile wraps common build commands for convenience.
 # The actual build is handled by scikit-build-core via pyproject.toml
 
-.PHONY: all bootstrap sync build rebuild test demos lint lint-check format format-check         typecheck qa clean distclean wheel sdist dist check publish-test         publish upgrade coverage coverage-html docs release help
+.PHONY: all bootstrap sync build rebuild test demos lint lint-check format format-check         typecheck qa clean distclean wheel sdist dist check publish-test         publish upgrade coverage coverage-html docs docs-serve docs-deploy release help
 
 # Prebuilt OGDF static library; its presence marks a completed bootstrap.
 OGDF_LIB := thirdparty/ogdf/build/libOGDF.a
@@ -14,11 +14,11 @@ all: build
 
 # Clone OGDF at the pinned tag and build its static libraries from source.
 bootstrap:
-	@./scripts/bootstrap_ogdf.sh
+	@python3 scripts/bootstrap_ogdf.py
 
 # Auto-bootstrap: build OGDF only if it has not been built yet.
 $(OGDF_LIB):
-	@./scripts/bootstrap_ogdf.sh
+	@python3 scripts/bootstrap_ogdf.py
 
 # Sync environment (initial setup, installs dependencies + package)
 sync: $(OGDF_LIB)
@@ -101,9 +101,18 @@ coverage-html:
 	@uv run pytest tests/ -v --cov=src/ogdf --cov-report=html
 	@echo "Coverage report: htmlcov/index.html"
 
-# Build documentation (requires sphinx in dev dependencies)
-docs:
-	@uv run sphinx-build -b html docs/ docs/_build/html
+# Build the documentation site with MkDocs (into site/).
+# Depends on demos so the gallery page (docs/gallery.md) is regenerated first.
+docs: demos
+	@uv run --group docs mkdocs build
+
+# Serve the documentation locally with live reload
+docs-serve: demos
+	@uv run --group docs mkdocs serve
+
+# Deploy the documentation to GitHub Pages (gh-pages branch)
+docs-deploy: demos
+	@uv run --group docs mkdocs gh-deploy
 
 # Create a release (bump version, tag, push)
 release:
@@ -150,7 +159,9 @@ help:
 	@echo "  upgrade      - Upgrade all dependencies"
 	@echo "  coverage     - Run tests with coverage"
 	@echo "  coverage-html- Generate HTML coverage report"
-	@echo "  docs         - Build documentation with Sphinx"
+	@echo "  docs         - Build the MkDocs documentation site"
+	@echo "  docs-serve   - Serve the docs locally with live reload"
+	@echo "  docs-deploy  - Deploy the docs to GitHub Pages"
 	@echo "  release      - Bump version, tag, and prepare release"
 	@echo "  clean        - Remove build artifacts"
 	@echo "  distclean    - Remove all generated files"

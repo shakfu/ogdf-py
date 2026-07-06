@@ -11,32 +11,45 @@ find_package(Threads REQUIRED)
 
 # --- OGDF (prebuilt static libraries) ---------------------------------------
 # OGDF is cloned at a pinned tag and built from source by
-# scripts/bootstrap_ogdf.sh, which produces libOGDF.a / libCOIN.a and the
-# generated config header. We link those static libs into the extension.
+# scripts/bootstrap_ogdf.py, which produces the OGDF/COIN static libraries and
+# the generated config header. We link those static libs into the extension.
 set(OGDF_ROOT "${CMAKE_SOURCE_DIR}/thirdparty/ogdf")
 set(OGDF_BUILD "${OGDF_ROOT}/build")
 
-# If OGDF has not been built yet, try to bootstrap it automatically (clone the
-# pinned tag + build from source). This lets `pip install` from an sdist work
-# without a separate manual step. Windows is not supported by the bash script.
-if(NOT EXISTS "${OGDF_BUILD}/libOGDF.a"
-   AND EXISTS "${CMAKE_SOURCE_DIR}/scripts/bootstrap_ogdf.sh"
-   AND NOT WIN32)
-    message(STATUS "OGDF not built; running scripts/bootstrap_ogdf.sh ...")
+# Locate the prebuilt OGDF/COIN static libraries produced by
+# scripts/bootstrap_ogdf.py. Search both the single-config location and the
+# multi-config Release/ subdirectory (used by MSVC and Xcode), and match both
+# the Unix (libOGDF.a) and MSVC (OGDF.lib) naming.
+set(_ogdf_lib_dirs "${OGDF_BUILD}" "${OGDF_BUILD}/Release")
+find_library(OGDF_LIBRARY NAMES OGDF libOGDF PATHS ${_ogdf_lib_dirs}
+             NO_DEFAULT_PATH)
+
+# If OGDF has not been built yet, bootstrap it automatically (clone the pinned
+# tag + build from source), then search again. This lets `pip install` from an
+# sdist work without a separate manual step. Uses the interpreter CMake found.
+if(NOT OGDF_LIBRARY AND EXISTS "${CMAKE_SOURCE_DIR}/scripts/bootstrap_ogdf.py")
+    message(STATUS "OGDF not built; running scripts/bootstrap_ogdf.py ...")
     execute_process(
-        COMMAND bash "${CMAKE_SOURCE_DIR}/scripts/bootstrap_ogdf.sh"
+        COMMAND "${Python_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/scripts/bootstrap_ogdf.py"
         RESULT_VARIABLE _ogdf_bootstrap_result)
     if(NOT _ogdf_bootstrap_result EQUAL 0)
         message(FATAL_ERROR
             "OGDF bootstrap failed (exit ${_ogdf_bootstrap_result}).")
     endif()
+    unset(OGDF_LIBRARY CACHE)
+    find_library(OGDF_LIBRARY NAMES OGDF libOGDF PATHS ${_ogdf_lib_dirs}
+                 NO_DEFAULT_PATH)
 endif()
 
-if(NOT EXISTS "${OGDF_BUILD}/libOGDF.a")
+find_library(COIN_LIBRARY NAMES COIN libCOIN PATHS ${_ogdf_lib_dirs}
+             NO_DEFAULT_PATH)
+
+if(NOT OGDF_LIBRARY OR NOT COIN_LIBRARY)
     message(FATAL_ERROR
-        "Prebuilt OGDF not found at ${OGDF_BUILD}/libOGDF.a.\n"
-        "Run the bootstrap script first:\n"
-        "    scripts/bootstrap_ogdf.sh\n"
+        "Prebuilt OGDF not found under ${OGDF_BUILD}.\n"
+        "Run the bootstrap first:\n"
+        "    python scripts/bootstrap_ogdf.py\n"
         "(or `make bootstrap`), which clones OGDF at a pinned tag and builds it.")
 endif()
 
@@ -46,10 +59,7 @@ set(OGDF_INCLUDE_DIRS
     "${OGDF_ROOT}/include"
     "${OGDF_BUILD}/include/ogdf-release")
 
-set(OGDF_LIBRARIES
-    "${OGDF_BUILD}/libOGDF.a"
-    "${OGDF_BUILD}/libCOIN.a"
-    Threads::Threads)
+set(OGDF_LIBRARIES ${OGDF_LIBRARY} ${COIN_LIBRARY} Threads::Threads)
 
 nanobind_add_module(_core
     src/ogdf/_core.cpp

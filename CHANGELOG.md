@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0]
+
+### Added
+
+- Layouts: `RadialTreeLayout`, `LinearLayout` (arc diagram), `TutteLayout` (convex planar), `DominanceLayout` / `VisibilityLayout` (upward, for DAGs), `MultilevelLayout` / `ModularMultilevelMixer` (large graphs), and `BalloonLayout`.
+
+- Algorithms: cut vertices (`cut_vertices`) and bridges (`bridges`), Bellman-Ford shortest paths (`bellman_ford`), minimum-cost flow (`min_cost_flow`), general maximum-weight matching (`maximum_weight_matching`, Blossom V), minimum Steiner tree (`steiner_tree`, Mehlhorn), maximal planar subgraph (`maximal_planar_subgraph`), and triconnectivity via `separation_pair` and `spqr_tree_summary`.
+
+- Cross-platform Python bootstrap (`scripts/bootstrap_ogdf.py`) replacing the bash script; generalized CMake linking (MSVC-aware); Windows build+test CI job.
+
+- MkDocs documentation site (`docs/`) with a coverage checklist and a Gallery page rendering the demo drawings; `make docs`, `make docs-serve`, `make docs-deploy`.
+
+- Demos: gallery entries for the new layouts, and algorithm visualizations for cut vertices/bridges, maximum-weight matching, Bellman-Ford distances, minimum-cost flow, the minimum Steiner tree, and the maximal planar subgraph.
+
+- Generators: circulant, complete-k-partite, globe, regular-lattice; graph products (cartesian, tensor, strong, lexicographical); operations (union, complement, suspension); and random models (preferential attachment, Chung-Lu, Watts-Strogatz, Waxman, geometric-cube, hierarchy, series-parallel DAG, triconnected, planar-biconnected, planar-triconnected).
+
+- Predicates and small algorithms: `is_two_edge_connected`, `is_regular`, `is_arborescence`, `triangulate`, `make_bimodal`, and `bfs_distances` (unweighted single-source distances).
+
+### Fixed
+
+- Removed the persistent CMake `build-dir` from `pyproject.toml`. Sharing it between editable installs and wheel builds could leave stale objects, so a `uv build --wheel` sometimes omitted recently-added functions. Each build now uses a fresh directory (OGDF is prebuilt, so this stays fast).
+
 ## [0.1.1]
 
 ### Added
@@ -32,7 +54,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- Reproducible OGDF dependency: `scripts/bootstrap_ogdf.sh` shallow-clones OGDF at a pinned tag (`foxglove-202510`) and builds its static libraries from source; the extension links them. `make build`/`make sync` auto-bootstrap if needed. Replaces reliance on a manually placed OGDF checkout.
+- Reproducible OGDF dependency: `scripts/bootstrap_ogdf.py` (cross-platform: Linux, macOS, Windows) shallow-clones OGDF at a pinned tag (`foxglove-202510`) and builds its static libraries from source; the extension links them. `make build`/`make sync` auto-bootstrap if needed. Replaces reliance on a manually placed OGDF checkout.
 
 - Persist the CMake build directory so only the bindings recompile on edits.
 
@@ -42,7 +64,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The generic `write` now raises `ValueError` for attribute-incapable formats (e.g. LEDA, Chaco) instead of crashing the interpreter.
 
-## [0.1.0] - 2026-07-06
+## [0.1.0]
 
 ### Added
 

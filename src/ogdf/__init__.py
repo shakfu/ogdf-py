@@ -19,4 +19,4 @@ from ogdf import _core
 from ogdf._core import *  # noqa: F403
 
 __all__ = [name for name in dir(_core) if not name.startswith("_")]
-__version__ = "0.1.1"
+__version__ = "0.2.0"
