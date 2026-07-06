@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    name: QA (lint, typecheck, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Cache the cloned+built OGDF so most runs skip the ~2 min build.
+      # Keyed on the bootstrap script (which pins the OGDF tag).
+      - name: Cache OGDF
+        uses: actions/cache@v4
+        with:
+          path: thirdparty/ogdf
+          key: ogdf-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.sh') }}
+
+      - name: Bootstrap OGDF
+        run: ./scripts/bootstrap_ogdf.sh
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies (builds the extension)
+        run: uv sync --dev
+
+      - name: Lint with ruff
+        run: uv run ruff check src/ tests/
+
+      - name: Check formatting with ruff
+        run: uv run ruff format --check src/ tests/
+
+      - name: Type check with mypy
+        run: uv run mypy src/ogdf tests/
+
+      - name: Run tests
+        run: uv run pytest tests/ -v --cov=src/ogdf --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v7
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

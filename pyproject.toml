@@ -1,0 +1,50 @@
+[project]
+name = "ogdf-py"
+version = "0.1.1"
+description = "Python bindings for the Open Graph Drawing Framework (OGDF), built with nanobind."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Shakeeb Alireza", email = "shakfu@users.noreply.github.com" }
+]
+requires-python = ">=3.10"
+keywords = ["nanobind", "python", "extension"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: C++",
+    "Typing :: Typed",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.1.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.20",
+    "twine>=6.2.0",
+]
+
+[build-system]
+requires = ["scikit-build-core>=0.12.2", "nanobind"]
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+wheel.packages = ["src/ogdf"]
+cmake.args = []
+cmake.define = {}
+cmake.build-type = "Release"
+cmake.source-dir = "."
+# Persist the CMake build tree so the CMake configure and _core.cpp objects are
+# cached across rebuilds. OGDF itself is prebuilt by scripts/bootstrap_ogdf.sh.
+build-dir = "build/{wheel_tag}"
+sdist.include = []
+sdist.exclude = []
+# Don't ship the C++ source inside the binary wheel.
+wheel.exclude = ["**/_core.cpp"]
+
