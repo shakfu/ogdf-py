@@ -87,7 +87,7 @@ jobs:
 
       # Cache the cloned+built OGDF per platform/arch so reruns skip the build.
       - name: Cache OGDF
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: thirdparty/ogdf
           key: ogdf-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py') }}

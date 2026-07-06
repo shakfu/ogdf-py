@@ -24,7 +24,7 @@ jobs:
       # Cache the cloned+built OGDF so most runs skip the ~2 min build.
       # Keyed on the bootstrap script (which pins the OGDF tag).
       - name: Cache OGDF
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: thirdparty/ogdf
           key: ogdf-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py') }}
@@ -71,7 +71,7 @@ jobs:
       # windows-latest ships git, CMake, and MSVC; the bootstrap builds OGDF
       # with the MSVC toolchain into thirdparty/ogdf/build/Release.
       - name: Cache OGDF
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: thirdparty/ogdf
           key: ogdf-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py') }}
