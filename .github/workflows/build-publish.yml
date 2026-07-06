@@ -22,9 +22,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Build CPython 3.10-3.13; skip musllinux (OGDF is bootstrapped on
+  # Build CPython 3.10-3.14; skip musllinux (OGDF is bootstrapped on
   # manylinux/glibc) and PyPy.
-  CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-*"
+  CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
   CIBW_SKIP: "*-musllinux_* pp*"
   # Clone + build OGDF once per platform before building any wheels. On Linux
   # this runs inside the manylinux container (git present; install cmake).
@@ -32,6 +32,9 @@ env:
     (command -v cmake >/dev/null 2>&1 || pipx install cmake) &&
     python3 scripts/bootstrap_ogdf.py
   CIBW_BEFORE_ALL_MACOS: python3 scripts/bootstrap_ogdf.py
+  # windows-latest ships git, CMake, and MSVC; the bootstrap builds OGDF with
+  # the MSVC toolchain.
+  CIBW_BEFORE_ALL_WINDOWS: python scripts/bootstrap_ogdf.py
   # Exercise each wheel end-to-end (import + layouts + I/O).
   CIBW_TEST_REQUIRES: pytest
   CIBW_TEST_COMMAND: pytest {project}/tests -v
@@ -75,6 +78,8 @@ jobs:
           - os: macos-14
             arch: arm64
             macos_target: "11.0"
+          - os: windows-latest
+            arch: AMD64
     env:
       MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos_target }}
     steps:

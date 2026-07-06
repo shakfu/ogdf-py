@@ -10,7 +10,7 @@ This is a **curated subset** of OGDF, not a full wrapper: enough to build graphs
 pip install ogdf-py
 ```
 
-Binary wheels are published for Linux (x86_64, aarch64) and macOS (x86_64, arm64) on CPython 3.10-3.13.
+Binary wheels are published for Linux (x86_64, aarch64), macOS (x86_64, arm64), and Windows (AMD64) on CPython 3.10-3.14.
 
 ## Example
 

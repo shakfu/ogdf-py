@@ -8,7 +8,7 @@
 pip install ogdf-py
 ```
 
-Wheels are available for Linux (x86_64, aarch64) and macOS (x86_64, arm64) on CPython 3.10-3.13. On other platforms pip falls back to the source distribution, which builds OGDF from source at install time (needs `git`, a C++17 compiler, and network access; Windows source builds are not supported).
+Wheels are available for Linux (x86_64, aarch64), macOS (x86_64, arm64), and Windows (AMD64) on CPython 3.10-3.14. On platforms without a matching wheel, pip falls back to the source distribution, which builds OGDF from source at install time; this needs `git`, a C++17 compiler (MSVC works), CMake, and network access.
 
 ### From source
 

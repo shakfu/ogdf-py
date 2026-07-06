@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Predicates and small algorithms: `is_two_edge_connected`, `is_regular`, `is_arborescence`, `triangulate`, `make_bimodal`, and `bfs_distances` (unweighted single-source distances).
 
+- Windows support: the release workflow now builds Windows (AMD64) wheels alongside Linux and macOS, and the wheel matrix covers CPython 3.10-3.14.
+
 ### Fixed
 
 - Removed the persistent CMake `build-dir` from `pyproject.toml`. Sharing it between editable installs and wheel builds could leave stale objects, so a `uv build --wheel` sometimes omitted recently-added functions. Each build now uses a fresh directory (OGDF is prebuilt, so this stays fast).
