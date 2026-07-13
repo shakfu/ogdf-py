@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <string>
 
 #include <ogdf/basic/GraphAttributes.h>
 #include <ogdf/basic/geometry.h>
@@ -23,6 +24,10 @@
 #include <ogdf/misclayout/LinearLayout.h>
 #include <ogdf/orthogonal/OrthoLayout.h>
 #include <ogdf/planarity/PlanarizationLayout.h>
+#include <ogdf/planarlayout/FPPLayout.h>
+#include <ogdf/planarlayout/MixedModelLayout.h>
+#include <ogdf/planarlayout/PlanarDrawLayout.h>
+#include <ogdf/planarlayout/PlanarStraightLayout.h>
 #include <ogdf/planarlayout/SchnyderLayout.h>
 #include <ogdf/tree/RadialTreeLayout.h>
 #include <ogdf/tree/TreeLayout.h>
@@ -56,6 +61,28 @@ static void seed_circle_if_degenerate(GraphAttributes& ga) {
         ga.x(v) = radius * std::cos(angle);
         ga.y(v) = radius * std::sin(angle);
         ++i;
+    }
+}
+
+// The planar grid layouts (FPP, PlanarStraight, PlanarDraw, MixedModel) require
+// a simple planar graph with at least 3 nodes; OGDF augments connectivity
+// internally but assumes planarity and simplicity. Guard here so bad input
+// raises a clear Python error instead of tripping an assertion or running into
+// undefined behaviour in a release build.
+static void require_simple_planar(const GraphAttributes& ga, const char* name) {
+    const Graph& g = ga.constGraph();
+    if (g.numberOfNodes() < 3) {
+        throw std::invalid_argument(std::string(name) +
+                                    " requires at least 3 nodes");
+    }
+    if (!isSimpleUndirected(g)) {
+        throw std::invalid_argument(std::string(name) +
+                                    " requires a simple graph (no self-loops or "
+                                    "parallel edges)");
+    }
+    if (!isPlanar(g)) {
+        throw std::invalid_argument(std::string(name) +
+                                    " requires a planar graph");
     }
 }
 
@@ -231,6 +258,83 @@ void register_layouts(nb::module_& m) {
              "graph_attributes"_a,
              "Compute a Schnyder straight-line planar grid layout (requires a "
              "simple planar graph with at least 3 nodes).");
+
+    // Straight-line planar grid drawing (de Fraysseix, Pach, Pollack). Like
+    // Schnyder, draws a simple planar graph without crossings on an integer
+    // grid.
+    nb::class_<FPPLayout>(m, "FPPLayout")
+        .def(nb::init<>())
+        .def("call",
+             [](FPPLayout& l, GraphAttributes& g) {
+                 require_simple_planar(g, "FPPLayout");
+                 l.call(g);
+             },
+             "graph_attributes"_a,
+             "Compute a de Fraysseix-Pach-Pollack straight-line planar grid "
+             "layout (requires a simple planar graph with at least 3 nodes).")
+        .def("set_separation",
+             [](FPPLayout& l, double x) { l.separation(x); }, "value"_a,
+             "Minimum distance between nodes.");
+
+    // Planar straight-line drawing with an augmentation/shelling-order pipeline.
+    nb::class_<PlanarStraightLayout>(m, "PlanarStraightLayout")
+        .def(nb::init<>())
+        .def("call",
+             [](PlanarStraightLayout& l, GraphAttributes& g) {
+                 require_simple_planar(g, "PlanarStraightLayout");
+                 l.call(g);
+             },
+             "graph_attributes"_a,
+             "Compute a straight-line planar grid layout (requires a simple "
+             "planar graph with at least 3 nodes).")
+        .def("set_separation",
+             [](PlanarStraightLayout& l, double x) { l.separation(x); },
+             "value"_a, "Minimum distance between nodes.")
+        .def("set_size_optimization",
+             [](PlanarStraightLayout& l, bool b) { l.sizeOptimization(b); },
+             "value"_a, "Try to reduce the grid size.")
+        .def("set_base_ratio",
+             [](PlanarStraightLayout& l, double x) { l.baseRatio(x); },
+             "value"_a, "Fraction of external-face nodes placed on the base "
+             "line.");
+
+    // Planar straight-line drawing tuned for a more balanced aspect ratio.
+    nb::class_<PlanarDrawLayout>(m, "PlanarDrawLayout")
+        .def(nb::init<>())
+        .def("call",
+             [](PlanarDrawLayout& l, GraphAttributes& g) {
+                 require_simple_planar(g, "PlanarDrawLayout");
+                 l.call(g);
+             },
+             "graph_attributes"_a,
+             "Compute a straight-line planar grid layout (requires a simple "
+             "planar graph with at least 3 nodes).")
+        .def("set_separation",
+             [](PlanarDrawLayout& l, double x) { l.separation(x); }, "value"_a,
+             "Minimum distance between nodes.")
+        .def("set_size_optimization",
+             [](PlanarDrawLayout& l, bool b) { l.sizeOptimization(b); },
+             "value"_a, "Try to reduce the grid size.")
+        .def("set_base_ratio",
+             [](PlanarDrawLayout& l, double x) { l.baseRatio(x); }, "value"_a,
+             "Fraction of external-face nodes placed on the base line.");
+
+    // Mixed-model planar layout: orthogonal-style routing with nodes drawn as
+    // boxes. Produces higher-quality planar drawings than the pure grid
+    // algorithms.
+    nb::class_<MixedModelLayout>(m, "MixedModelLayout")
+        .def(nb::init<>())
+        .def("call",
+             [](MixedModelLayout& l, GraphAttributes& g) {
+                 require_simple_planar(g, "MixedModelLayout");
+                 l.call(g);
+             },
+             "graph_attributes"_a,
+             "Compute a mixed-model planar layout (requires a simple planar "
+             "graph with at least 3 nodes).")
+        .def("set_separation",
+             [](MixedModelLayout& l, double x) { l.separation(x); }, "value"_a,
+             "Minimum distance between nodes.");
 
     // Radial tree drawing (concentric levels). Requires a tree.
     nb::enum_<RadialTreeLayout::RootSelectionType>(m, "RadialRootSelection")

@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0]
+
+### Added
+
+- Planar layouts: `FPPLayout`, `PlanarStraightLayout`, `PlanarDrawLayout`, and `MixedModelLayout` - straight-line and mixed-model planar grid drawings, completing the planar-drawing family alongside `SchnyderLayout`. Each validates that the input is a simple planar graph with at least 3 nodes.
+
+- Shortest paths: `a_star_search`, point-to-point A* with an optional admissible heuristic; returns the path length and edges, or `None` if the target is unreachable.
+
+- Crossing minimization: `crossing_number` (heuristic minimum crossings via the subgraph planarizer) and `insert_edges` (routes a chosen set of edges through the otherwise-planar rest of the graph and returns, per edge, the original edges it crosses).
+
+- Flow / cut and connectivity: `min_st_cut` (directed or undirected s-t minimum cut, returning the value and the cut edges) and `node_connectivity` / `edge_connectivity` (global and local/Menger k-connectivity).
+
+- Documentation: expanded the coverage checklist with a priority roadmap.
+
 ## [0.2.0]
 
 ### Added

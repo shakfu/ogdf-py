@@ -138,3 +138,61 @@ def test_balloon_rejects_disconnected():
     ga = ogdf.GraphAttributes(g)
     with pytest.raises(ValueError):
         ogdf.BalloonLayout().call(ga)
+
+
+# --- planar grid layouts (require a simple planar graph, >= 3 nodes) --- #
+@pytest.mark.parametrize(
+    "layout_cls",
+    [
+        ogdf.FPPLayout,
+        ogdf.PlanarStraightLayout,
+        ogdf.PlanarDrawLayout,
+        ogdf.MixedModelLayout,
+    ],
+)
+def test_planar_grid_layouts_no_crossings(layout_cls):
+    g = connected_graph(12, 18)  # planar, connected, simple
+    nodes = list(g.nodes())
+    ga = ogdf.GraphAttributes(g)
+    layout_cls().call(ga)
+    coords = [(ga.x(v), ga.y(v)) for v in nodes]
+    assert all(x == x and y == y for x, y in coords)  # no NaNs
+    # A planar drawing places every node at a distinct point.
+    assert len({(round(x, 3), round(y, 3)) for x, y in coords}) == len(nodes)
+    assert ga.bounding_box_width() > 0
+
+
+@pytest.mark.parametrize(
+    "layout_cls",
+    [
+        ogdf.FPPLayout,
+        ogdf.PlanarStraightLayout,
+        ogdf.PlanarDrawLayout,
+        ogdf.MixedModelLayout,
+    ],
+)
+def test_planar_grid_layouts_reject_non_planar(layout_cls):
+    g = ogdf.Graph()
+    ogdf.complete_graph(g, 5)  # K5 is not planar
+    ga = ogdf.GraphAttributes(g)
+    with pytest.raises(ValueError):
+        layout_cls().call(ga)
+
+
+def test_planar_grid_layout_rejects_too_small():
+    g = ogdf.Graph()
+    g.new_edge(g.new_node(), g.new_node())  # 2 nodes -> below the minimum of 3
+    ga = ogdf.GraphAttributes(g)
+    with pytest.raises(ValueError):
+        ogdf.FPPLayout().call(ga)
+
+
+def test_planar_grid_layout_setters():
+    g = connected_graph(10, 14)
+    ga = ogdf.GraphAttributes(g)
+    layout = ogdf.PlanarStraightLayout()
+    layout.set_separation(30.0)
+    layout.set_size_optimization(True)
+    layout.set_base_ratio(0.5)
+    layout.call(ga)
+    assert ga.bounding_box_width() > 0

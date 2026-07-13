@@ -2,9 +2,33 @@
 
 This page tracks what OGDF functionality is exposed by `ogdf-py`. It is a living checklist: `ogdf-py` is a **curated subset**, so most of OGDF is intentionally excluded.
 
-**Legend:** `[x]` = bound and available in Python, `[ ]` = not (yet) bound.
+**Legend:** `[x]` = bound and available in Python, `[ ]` = not (yet) bound. Unbound items scheduled for the next additions may be tagged `**(priority)**`; see the [Priority roadmap](#priority-roadmap).
 
-**Scope rationale.** The binding targets OGDF's genuine differentiators for Python users - **graph drawing** and **planarity** - plus a **core set of common graph algorithms** (even where these overlap networkx/scipy) for a self-contained experience. Exotic or specialized algorithms, and large subsystems (clustering, UML, hypergraphs, upward planarity), are excluded unless there is concrete demand. Contributions that move an item from `[ ]` to `[x]` are welcome.
+**Scope rationale.** The binding targets OGDF's genuine differentiators for Python users - **graph drawing** and **planarity** - plus a **core set of common graph algorithms** (even where these overlap networkx/scipy) for a self-contained experience. Because that common-algorithm core is explicitly in scope, canonical routines users reach for next to what is already bound - notably **A\*** (alongside `dijkstra`/`bellman_ford`) - are treated as in-scope gaps to close, not as exotic exclusions. That said, the core covers algorithms OGDF actually implements well: **PageRank** is intentionally omitted because OGDF only ships an undirected, [0, 1]-normalized variant that is degree-dominated and not the canonical directed measure (see below). Genuinely exotic or specialized algorithms, and large subsystems (clustering, UML, hypergraphs, cluster planarity, SEFE), are excluded unless there is concrete demand. Contributions that move an item from `[ ]` to `[x]` are welcome.
+
+## Priority roadmap
+
+Highest-value gaps given the drawing + planarity focus and the common-algorithm core. Tiers 1 and 2 are complete; nothing is currently scheduled. Future priorities, when chosen, are tagged `**(priority)**` in the sections below.
+
+**Done (Tier 1):**
+
+1. **Planar straight-line grid layouts** - `FPPLayout`, `PlanarStraightLayout`, `PlanarDrawLayout`, `MixedModelLayout`, completing the planar-drawing family alongside `SchnyderLayout`.
+
+2. **Common shortest-path gap** - `a_star_search`. (PageRank was evaluated and dropped: OGDF's `BasicPageRank` is undirected and [0, 1]-normalized, so it is degree-dominated and not canonical directed PageRank - little unique value over `node.degree`. Directed PageRank is left to networkx/igraph rather than hand-rolled here.)
+
+3. **Crossing number** - `crossing_number`, the heuristic minimum computed by the subgraph planarizer, now a standalone call rather than a hidden step in `PlanarizationLayout`.
+
+**Done (Tier 2):**
+
+4. **s-t min cut** (`min_st_cut`, directed or undirected) and **k-connectivity** (`node_connectivity`, `edge_connectivity`, global and local) - completing the flow/cut and connectivity families that were only partially bound.
+
+**Done (Tier 2, follow-on):**
+
+5. **Edge-insertion routing** (`insert_edges`) - routes a chosen set of edges through the rest of the graph (which must be planar once they are removed) and returns, per edge, the original edges it crosses. Uses the variable-embedding inserter with no remove-reinsert, so crossings are attributed cleanly to the inserted edges rather than re-routed across the whole drawing.
+
+**Not scheduled:**
+
+- Planarity depth: combinatorial embedding + dual graph, upward planarity testing, planar separators.
 
 ## Graph model and attributes
 
@@ -56,17 +80,17 @@ This page tracks what OGDF functionality is exposed by `ogdf-py`. It is a living
 
 - [x] `RadialTreeLayout`
 
-- [ ] `BertaultLayout`
+- [ ] `BertaultLayout` (deprioritized: five force-directed layouts already bound)
 
-- [ ] `DavidsonHarelLayout`
+- [ ] `DavidsonHarelLayout` (deprioritized: force-directed, marginal over existing)
 
 - [x] `MultilevelLayout` / `ModularMultilevelMixer`
 
-- [ ] `FastMultipoleEmbedder`
+- [ ] `FastMultipoleEmbedder` (deprioritized: FMMM already covers large-graph force layout)
 
-- [ ] `NodeRespecterLayout`
+- [ ] `NodeRespecterLayout` (bind on demand: only distinct hook is respecting real node sizes to avoid overlap)
 
-- [ ] `PlanarStraightLayout` / `PlanarDrawLayout` / `FPPLayout`
+- [x] Planar straight-line grid layouts: `FPPLayout`, `PlanarStraightLayout`, `PlanarDrawLayout`, `MixedModelLayout` (companions to `SchnyderLayout`)
 
 - [x] `TutteLayout`
 
@@ -100,6 +124,8 @@ This page tracks what OGDF functionality is exposed by `ogdf-py`. It is a living
 
 - [x] Triconnectivity: separation pair (`separation_pair`) and SPQR-tree summary (`spqr_tree_summary`)
 
+- [x] node/edge k-connectivity values, global and local/Menger (`node_connectivity`, `edge_connectivity`)
+
 - [ ] BC-trees / decomposition
 
 ### Planarity
@@ -110,7 +136,9 @@ This page tracks what OGDF functionality is exposed by `ogdf-py`. It is a living
 
 - [x] Maximal planar subgraph (`maximal_planar_subgraph`)
 
-- [ ] Edge insertion / crossing minimization (as standalone API)
+- [x] Crossing number (`crossing_number`, heuristic via subgraph planarizer + edge insertion)
+
+- [x] Edge insertion routing (`insert_edges`, routes edges through the fixed planar rest and returns the edges each one crosses)
 
 - [ ] Upward planarity testing
 
@@ -120,7 +148,7 @@ This page tracks what OGDF functionality is exposed by `ogdf-py`. It is a living
 
 - [x] `dijkstra` (single-source, weighted)
 
-- [ ] A* search
+- [x] A* search (`a_star_search`, point-to-point; optional admissible heuristic)
 
 - [x] Bellman-Ford (`bellman_ford`, negative weights)
 
@@ -138,7 +166,7 @@ This page tracks what OGDF functionality is exposed by `ogdf-py`. It is a living
 
 - [x] Min-cost flow (`min_cost_flow`, Reinelt)
 
-- [ ] Min s-t cut variants
+- [x] s-t min cut, directed or undirected (`min_st_cut`, returns value and cut edges; companion to global `min_cut` + `max_flow`)
 
 - [ ] Nagamochi-Ibaraki min cut
 
@@ -154,13 +182,13 @@ This page tracks what OGDF functionality is exposed by `ogdf-py`. It is a living
 
 - [ ] Other coloring heuristics (Berger-Rompel, Johnson, Wigderson, ...)
 
-### Excluded algorithm families
+### Specialized / excluded algorithm families
 
 - [x] Steiner trees (`steiner_tree`, Mehlhorn; OGDF has ~9 implementations)
 
 - [ ] Graph spanners (Baswana-Sen, Berman, Elkin-Neiman, ...)
 
-- [ ] PageRank
+- [ ] PageRank (OGDF's `BasicPageRank` is undirected and min-max normalized to [0, 1] - degree-dominated and not canonical directed PageRank; use networkx/igraph for the standard measure)
 
 - [ ] Voronoi diagrams / convex hull
 

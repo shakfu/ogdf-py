@@ -146,6 +146,32 @@ def test_min_cut():
     assert ogdf.min_cut(c, weight) == 2.0
 
 
+def test_min_st_cut_matches_max_flow():
+    g = ogdf.Graph()
+    s, a, t = g.new_node(), g.new_node(), g.new_node()
+    e1 = g.new_edge(s, a)
+    e2 = g.new_edge(a, t)
+    e3 = g.new_edge(s, t)
+    cap = ogdf.EdgeArrayDouble(g)
+    cap[e1], cap[e2], cap[e3] = 3.0, 2.0, 5.0
+    value, edges = ogdf.min_st_cut(g, cap, s, t)
+    # Max-flow min-cut duality: the cut value equals the max flow (7).
+    flow = ogdf.EdgeArrayDouble(g)
+    assert value == ogdf.max_flow(g, cap, s, t, flow) == 7.0
+    # The min cut severs a->t (2) and s->t (5); the cut-edge weights sum to it.
+    assert sum(cap[e] for e in edges) == value
+    assert {e.index for e in edges} == {e2.index, e3.index}
+
+
+def test_min_st_cut_undirected():
+    # Two parallel-in-series paths between s and t; undirected cut is 2.
+    c, nodes = cycle(4)  # s - x - t - y - s
+    weight = ogdf.EdgeArrayDouble(c, 1.0)
+    value, edges = ogdf.min_st_cut(c, weight, nodes[0], nodes[2], directed=False)
+    assert value == 2.0
+    assert len(list(edges)) == 2
+
+
 # --- matching --- #
 def test_maximal_matching():
     g, nodes = path(5)
@@ -362,3 +388,165 @@ def test_bfs_distances():
     dist = ogdf.NodeArrayInt(g)
     ogdf.bfs_distances(g, nodes[0], dist)
     assert [dist[v] for v in nodes] == [0, 1, 2, 3, 4]
+
+
+# --- A* search --- #
+def test_a_star_search_path():
+    g, nodes = path(5)  # a-b-c-d-e
+    cost = ogdf.EdgeArrayDouble(g, 2.0)
+    length, edges = ogdf.a_star_search(g, cost, nodes[0], nodes[4])
+    assert length == 8.0  # 4 hops * 2.0
+    edges = list(edges)
+    assert len(edges) == 4
+    # The returned edges form a walk from source to target.
+    assert edges[0].source.index == nodes[0].index
+    assert edges[-1].target.index == nodes[4].index
+
+
+def test_a_star_search_unreachable():
+    g = ogdf.Graph()
+    a, b = g.new_node(), g.new_node()  # no edge between them
+    assert ogdf.a_star_search(g, ogdf.EdgeArrayDouble(g, 1.0), a, b) is None
+
+
+def test_a_star_search_admissible_heuristic_is_optimal():
+    # A shortcut edge must win even with a (zero) heuristic supplied. An
+    # admissible heuristic never changes the optimal length.
+    g = ogdf.Graph()
+    n = [g.new_node() for _ in range(4)]
+    e_long = [g.new_edge(n[i], n[i + 1]) for i in range(3)]  # 0-1-2-3
+    e_short = g.new_edge(n[0], n[3])  # direct shortcut
+    cost = ogdf.EdgeArrayDouble(g)
+    for e in e_long:
+        cost[e] = 1.0
+    cost[e_short] = 2.0  # 2.0 < 3.0 for the long path
+    length, edges = ogdf.a_star_search(g, cost, n[0], n[3], False, lambda v: 0.0)
+    assert length == 2.0
+    assert [e.index for e in edges] == [e_short.index]
+
+
+# --- crossing number --- #
+def test_crossing_number_planar_is_zero():
+    g = ogdf.Graph()
+    ogdf.random_planar_connected_graph(g, 15, 25)
+    assert ogdf.crossing_number(g) == 0
+
+
+def test_crossing_number_k5():
+    k5 = ogdf.Graph()
+    ogdf.complete_graph(k5, 5)  # crossing number of K5 is 1
+    assert ogdf.crossing_number(k5) == 1
+    assert k5.number_of_edges() == 10  # graph is not modified
+
+
+def test_crossing_number_k6_at_least_three():
+    k6 = ogdf.Graph()
+    ogdf.complete_graph(k6, 6)  # true crossing number is 3
+    # The planarizer yields a real drawing, so its count is >= the optimum.
+    assert ogdf.crossing_number(k6) >= 3
+
+
+def test_crossing_number_rejects_bad_permutations():
+    g = ogdf.Graph()
+    ogdf.complete_graph(g, 5)
+    with pytest.raises(ValueError):
+        ogdf.crossing_number(g, 0)
+
+
+# --- edge insertion (routing with crossings) --- #
+def test_insert_edges_k5_single_crossing():
+    k5 = ogdf.Graph()
+    ogdf.complete_graph(k5, 5)
+    # Removing any single edge leaves a maximal planar graph; reinserting it
+    # forces exactly one crossing.
+    e = list(k5.edges())[0]
+    routes = ogdf.insert_edges(k5, [e])
+    assert len(routes) == 1
+    inserted, crossed = routes[0]
+    assert inserted.index == e.index
+    crossed = list(crossed)
+    assert len(crossed) == 1
+    # A valid drawing only crosses independent edges (no shared endpoint), and
+    # never the inserted edge itself.
+    endpoints = {e.source.index, e.target.index}
+    other = crossed[0]
+    assert other.index != e.index
+    assert endpoints.isdisjoint({other.source.index, other.target.index})
+    assert k5.number_of_edges() == 10  # graph unmodified
+
+
+def test_insert_edges_matches_crossing_number_small():
+    for n in (5, 6):
+        g = ogdf.Graph()
+        ogdf.complete_graph(g, n)
+        removed = list(ogdf.maximal_planar_subgraph(g))
+        routes = ogdf.insert_edges(g, removed)
+        total = sum(len(list(c)) for _, c in routes)
+        # Insertion into the fixed planar subgraph is an upper bound on the
+        # crossing number; for these small complete graphs it is tight.
+        assert total == ogdf.crossing_number(g)
+        assert {ins.index for ins, _ in routes} == {e.index for e in removed}
+
+
+def test_insert_edges_planar_no_crossings():
+    g = ogdf.Graph()
+    ogdf.random_planar_connected_graph(g, 12, 20)
+    e = list(g.edges())[0]
+    routes = ogdf.insert_edges(g, [e])
+    # Removing and reinserting one edge of a planar graph needs no crossings.
+    assert [len(list(c)) for _, c in routes] == [0]
+
+
+def test_insert_edges_empty():
+    g = ogdf.Graph()
+    ogdf.complete_graph(g, 5)
+    assert list(ogdf.insert_edges(g, [])) == []
+
+
+def test_insert_edges_rejects_non_planar_remainder():
+    k6 = ogdf.Graph()
+    ogdf.complete_graph(k6, 6)
+    # K6 minus a single edge is still non-planar, so the remainder is invalid.
+    with pytest.raises(ValueError):
+        ogdf.insert_edges(k6, [list(k6.edges())[0]])
+
+
+# --- k-connectivity --- #
+def test_global_connectivity_known_values():
+    c, _ = cycle(5)  # a cycle is 2-node- and 2-edge-connected
+    assert ogdf.node_connectivity(c) == 2
+    assert ogdf.edge_connectivity(c) == 2
+
+    p, _ = path(4)  # a path is 1-connected
+    assert ogdf.node_connectivity(p) == 1
+    assert ogdf.edge_connectivity(p) == 1
+
+    k4 = ogdf.Graph()
+    ogdf.complete_graph(k4, 4)  # K4 is 3-connected
+    assert ogdf.node_connectivity(k4) == 3
+    assert ogdf.edge_connectivity(k4) == 3
+
+
+def test_connectivity_trivial_graph_is_zero():
+    g = ogdf.Graph()
+    g.new_node()  # a single node
+    assert ogdf.node_connectivity(g) == 0
+    assert ogdf.edge_connectivity(g) == 0
+
+
+def test_local_connectivity_menger():
+    # Two internally disjoint s-t paths -> local connectivity 2.
+    g = ogdf.Graph()
+    s, t = g.new_node(), g.new_node()
+    mids = [g.new_node() for _ in range(2)]
+    for m in mids:
+        g.new_edge(s, m)
+        g.new_edge(m, t)
+    assert ogdf.node_connectivity(g, s, t) == 2
+    assert ogdf.edge_connectivity(g, s, t) == 2
+
+
+def test_local_connectivity_rejects_same_node():
+    g, nodes = path(3)
+    with pytest.raises(ValueError):
+        ogdf.node_connectivity(g, nodes[0], nodes[0])

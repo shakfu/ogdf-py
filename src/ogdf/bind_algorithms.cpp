@@ -9,6 +9,7 @@
 
 #include <nanobind/stl/string.h>
 
+#include <functional>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -18,7 +19,10 @@
 #include <ogdf/basic/extended_graph_alg.h>
 #include <ogdf/basic/simple_graph_alg.h>
 #include <ogdf/decomposition/StaticSPQRTree.h>
+#include <ogdf/graphalg/AStarSearch.h>
+#include <ogdf/graphalg/ConnectivityTester.h>
 #include <ogdf/graphalg/Dijkstra.h>
+#include <ogdf/graphalg/MinSTCutMaxFlow.h>
 #include <ogdf/graphalg/Matching.h>
 #include <ogdf/graphalg/MatchingBlossomV.h>
 #include <ogdf/graphalg/MaxFlowGoldbergTarjan.h>
@@ -28,6 +32,10 @@
 #include <ogdf/graphalg/NodeColoringRecursiveLargestFirst.h>
 #include <ogdf/graphalg/ShortestPathAlgorithms.h>
 #include <ogdf/planarity/MaximalPlanarSubgraphSimple.h>
+#include <ogdf/planarity/PlanRep.h>
+#include <ogdf/planarity/PlanRepLight.h>
+#include <ogdf/planarity/SubgraphPlanarizer.h>
+#include <ogdf/planarity/VariableEmbeddingInserter.h>
 #include <ogdf/graphalg/ShortestPathWithBFM.h>
 #include <ogdf/graphalg/steiner_tree/EdgeWeightedGraph.h>
 #include <ogdf/graphalg/steiner_tree/EdgeWeightedGraphCopy.h>
@@ -69,6 +77,60 @@ void register_algorithms(nb::module_& m) {
           "True if every node has the same degree.");
     m.def("is_regular", [](const Graph& g, int d) { return isRegular(g, d); },
           "graph"_a, "degree"_a, "True if every node has degree d.");
+
+    // ---------------------------------------------------------------- //
+    // k-connectivity (node / edge)                                     //
+    // ---------------------------------------------------------------- //
+    auto global_connectivity = [](const Graph& g, bool node_conn,
+                                  bool directed) {
+        if (g.numberOfNodes() < 2) {
+            return 0;  // connectivity of the trivial graph is 0 by convention
+        }
+        NodeArray<NodeArray<int>> conn(g);
+        for (node v : g.nodes) {
+            conn[v].init(g);
+        }
+        ConnectivityTester ct(node_conn, directed);
+        return ct.computeConnectivity(g, conn);
+    };
+    auto local_connectivity = [](const Graph& g, node s, node t, bool node_conn,
+                                 bool directed) {
+        if (s == t) {
+            throw std::invalid_argument("source and target must differ");
+        }
+        ConnectivityTester ct(node_conn, directed);
+        return ct.computeConnectivity(g, s, t);
+    };
+    m.def("node_connectivity",
+          [global_connectivity](const Graph& g, bool directed) {
+              return global_connectivity(g, true, directed);
+          },
+          "graph"_a, "directed"_a = false,
+          "Global node (vertex) connectivity: the minimum number of nodes whose "
+          "removal disconnects the graph. Returns 0 for a graph with fewer than "
+          "two nodes.");
+    m.def("node_connectivity",
+          [local_connectivity](const Graph& g, node s, node t, bool directed) {
+              return local_connectivity(g, s, t, true, directed);
+          },
+          "graph"_a, "source"_a, "target"_a, "directed"_a = false,
+          "Local node connectivity: the maximum number of internally "
+          "node-disjoint source-to-target paths (Menger).");
+    m.def("edge_connectivity",
+          [global_connectivity](const Graph& g, bool directed) {
+              return global_connectivity(g, false, directed);
+          },
+          "graph"_a, "directed"_a = false,
+          "Global edge connectivity: the minimum number of edges whose removal "
+          "disconnects the graph. Returns 0 for a graph with fewer than two "
+          "nodes.");
+    m.def("edge_connectivity",
+          [local_connectivity](const Graph& g, node s, node t, bool directed) {
+              return local_connectivity(g, s, t, false, directed);
+          },
+          "graph"_a, "source"_a, "target"_a, "directed"_a = false,
+          "Local edge connectivity: the maximum number of edge-disjoint "
+          "source-to-target paths (Menger).");
 
     // ---------------------------------------------------------------- //
     // Components (return count; write ids into the output array)        //
@@ -183,6 +245,28 @@ void register_algorithms(nb::module_& m) {
           "graph"_a, "weight"_a,
           "Global minimum cut value (Stoer-Wagner) for an undirected weighted "
           "graph.");
+    m.def("min_st_cut",
+          [](const Graph& g, const EdgeArray<double>& weight, node s, node t,
+             bool directed) {
+              // Cut edges are those leaving the source side; treatAsUndirected
+              // is the inverse of `directed`. With directed=True the cut value
+              // equals the directed max flow (max-flow min-cut duality).
+              List<edge> cut;
+              MinSTCutMaxFlow<double> mc(/*treatAsUndirected=*/!directed);
+              mc.call(g, weight, s, t, cut);
+              double value = 0.0;
+              nb::list edges;
+              for (edge e : cut) {
+                  value += weight[e];
+                  edges.append(nb::cast(e, nb::rv_policy::reference));
+              }
+              return nb::make_tuple(value, edges);
+          },
+          "graph"_a, "weight"_a, "source"_a, "sink"_a, "directed"_a = true,
+          "Minimum s-t cut. Returns (cut_value, [cut_edges]) where the edges "
+          "are those crossing from the source side to the sink side. With "
+          "`directed` (the default) the value equals the directed maximum flow "
+          "from source to sink; set it False to treat edges as undirected.");
 
     // ---------------------------------------------------------------- //
     // Matching                                                         //
@@ -292,6 +376,50 @@ void register_algorithms(nb::module_& m) {
           "negative cycle exists; writes distances into `distance`.");
 
     // ---------------------------------------------------------------- //
+    // A* search (point-to-point shortest path)                         //
+    // ---------------------------------------------------------------- //
+    m.def("a_star_search",
+          [](const Graph& g, const EdgeArray<double>& cost, node source,
+             node target, bool directed,
+             nb::object heuristic) -> nb::object {
+              // The heuristic is an optional Python callable node -> float; a
+              // zero heuristic makes A* equivalent to Dijkstra.
+              std::function<double(node)> h = [](node) { return 0.0; };
+              if (!heuristic.is_none()) {
+                  h = [heuristic](node v) {
+                      return nb::cast<double>(
+                          heuristic(nb::cast(v, nb::rv_policy::reference)));
+                  };
+              }
+              NodeArray<edge> predecessor(g);
+              double length = AStarSearch<double>(directed).call(
+                  g, cost, source, target, predecessor, h);
+              // predecessor[target] is null when no path exists (unless the
+              // target is the source itself, a zero-length path).
+              if (source != target && predecessor[target] == nullptr) {
+                  return nb::none();
+              }
+              List<edge> reversed;
+              for (node v = target; v != source;) {
+                  edge e = predecessor[v];
+                  reversed.pushFront(e);
+                  v = e->opposite(v);
+              }
+              nb::list path;
+              for (edge e : reversed) {
+                  path.append(nb::cast(e, nb::rv_policy::reference));
+              }
+              return nb::make_tuple(length, path);
+          },
+          "graph"_a, "cost"_a, "source"_a, "target"_a, "directed"_a = false,
+          "heuristic"_a = nb::none(),
+          "A* shortest path from `source` to `target` with non-negative edge "
+          "costs. `heuristic` is an optional callable mapping a node to an "
+          "admissible lower-bound distance to the target (a zero heuristic "
+          "reduces A* to Dijkstra). Returns (length, [path_edges]) or None if "
+          "the target is unreachable.");
+
+    // ---------------------------------------------------------------- //
     // General maximum-weight matching (Blossom V)                      //
     // ---------------------------------------------------------------- //
     m.def("maximum_weight_matching",
@@ -397,6 +525,126 @@ void register_algorithms(nb::module_& m) {
           "graph"_a,
           "Return the edges removed to obtain a maximal planar subgraph. An "
           "empty list means the graph is already planar.");
+
+    // ---------------------------------------------------------------- //
+    // Crossing minimization                                            //
+    // ---------------------------------------------------------------- //
+    m.def("crossing_number",
+          [](const Graph& g, int permutations) {
+              if (permutations < 1) {
+                  throw std::invalid_argument("permutations must be >= 1");
+              }
+              // PlanRep copies the input graph, so `g` is not modified. The
+              // planarizer works one connected component at a time; sum the
+              // per-component crossing counts.
+              PlanRep pr(g);
+              SubgraphPlanarizer sp;
+              sp.permutations(permutations);
+              int total = 0;
+              for (int cc = 0; cc < pr.numberOfCCs(); ++cc) {
+                  int crossings = 0;
+                  sp.call(pr, cc, crossings);
+                  total += crossings;
+              }
+              return total;
+          },
+          "graph"_a, "permutations"_a = 1,
+          "Heuristic minimum number of edge crossings (subgraph planarizer). "
+          "Returns 0 for a planar graph. `permutations` sets the number of "
+          "randomized restarts of the edge-insertion phase; more restarts can "
+          "lower the count at higher cost. Does not modify the graph.");
+
+    // ---------------------------------------------------------------- //
+    // Edge insertion (routing with crossings)                          //
+    // ---------------------------------------------------------------- //
+    m.def("insert_edges",
+          [](const Graph& g, nb::list edges) {
+              // Deduplicate the requested edges, preserving the caller's order.
+              List<edge> want;
+              std::unordered_set<edge> seen;
+              for (auto handle : edges) {
+                  edge e = nb::cast<edge>(handle);
+                  if (seen.insert(e).second) {
+                      want.pushBack(e);
+                  }
+              }
+
+              PlanRep pr(g);
+              VariableEmbeddingInserter inserter;
+
+              nb::list result;  // list of (edge, [crossed edges in order])
+              for (int cc = 0; cc < pr.numberOfCCs(); ++cc) {
+                  pr.initCC(cc);
+                  PlanRepLight prl(pr);
+                  prl.initCC(cc);
+
+                  // Restrict the requested edges to this component.
+                  List<edge> here;
+                  for (edge e : want) {
+                      if (prl.copy(e) != nullptr) {
+                          here.pushBack(e);
+                      }
+                  }
+                  if (here.empty()) {
+                      continue;
+                  }
+
+                  // Remove them so `prl` holds the planar subgraph, then insert
+                  // them back with crossings.
+                  for (edge e : here) {
+                      prl.delEdge(prl.copy(e));
+                  }
+                  if (!isPlanar(prl)) {
+                      throw std::invalid_argument(
+                          "the graph minus the given edges must be planar");
+                  }
+
+                  Array<edge> to_insert(here.size());
+                  int i = 0;
+                  for (edge e : here) {
+                      to_insert[i++] = e;
+                  }
+                  if (!Module::isSolution(inserter.callEx(prl, to_insert))) {
+                      throw std::runtime_error("edge insertion failed");
+                  }
+
+                  // Each inserted edge becomes a chain of copy edges; every
+                  // node shared by two consecutive chain edges is a crossing
+                  // dummy. The other original edge through that dummy is the
+                  // edge being crossed.
+                  for (edge e : here) {
+                      nb::list route;
+                      edge prev = nullptr;
+                      for (edge ce : prl.chain(e)) {
+                          if (prev != nullptr) {
+                              node v = (ce->source() == prev->source() ||
+                                        ce->source() == prev->target())
+                                           ? ce->source()
+                                           : ce->target();
+                              for (adjEntry adj : v->adjEntries) {
+                                  edge other = prl.original(adj->theEdge());
+                                  if (other != nullptr && other != e) {
+                                      route.append(nb::cast(
+                                          other, nb::rv_policy::reference));
+                                      break;
+                                  }
+                              }
+                          }
+                          prev = ce;
+                      }
+                      result.append(nb::make_tuple(
+                          nb::cast(e, nb::rv_policy::reference), route));
+                  }
+              }
+              return result;
+          },
+          "graph"_a, "edges"_a,
+          "Route the given edges through the rest of the graph, which must be "
+          "planar once those edges are removed. Returns a list of "
+          "(edge, [crossed_edges]) pairs: for each requested edge, the original "
+          "edges it crosses, in order from the edge's source to its target. An "
+          "edge inserted without crossings maps to an empty list. Uses the "
+          "variable-embedding inserter; does not modify the graph.");
 
     // ---------------------------------------------------------------- //
     // Triconnectivity / SPQR                                           //
