@@ -270,7 +270,7 @@ Whole OGDF modules that are out of scope for the current curated subset:
 
 - [ ] Hypergraphs
 
-- [ ] Upward planarity and upward drawing
+- Upward drawing and upward planarity are *not* a wholesale exclusion: `DominanceLayout` / `VisibilityLayout` (upward drawing for DAGs) are bound, and upward planarity testing is tracked as an open gap in the [Planarity](#planarity) section
 
 - [ ] Simultaneous embedding (SEFE) / SyncPlan
 

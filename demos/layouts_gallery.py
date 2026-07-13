@@ -60,6 +60,10 @@ LAYOUTS = [
     ("stress_minimization", ogdf.StressMinimization, planar_graph),
     ("pivot_mds", ogdf.PivotMDS, planar_graph),
     ("schnyder", ogdf.SchnyderLayout, planar_graph),
+    ("fpp", ogdf.FPPLayout, planar_graph),
+    ("planar_straight", ogdf.PlanarStraightLayout, planar_graph),
+    ("planar_draw", ogdf.PlanarDrawLayout, planar_graph),
+    ("mixed_model", ogdf.MixedModelLayout, planar_graph),
     ("circular", ogdf.CircularLayout, planar_graph),
     ("tree", ogdf.TreeLayout, tree_graph),
     ("radial_tree", ogdf.RadialTreeLayout, tree_graph),
@@ -67,6 +71,7 @@ LAYOUTS = [
     ("dominance", ogdf.DominanceLayout, dag),
     ("visibility", ogdf.VisibilityLayout, dag),
     ("multilevel", ogdf.MultilevelLayout, large_graph),
+    ("modular_multilevel_mixer", ogdf.ModularMultilevelMixer, large_graph),
     ("balloon", ogdf.BalloonLayout, planar_graph),
 ]
 

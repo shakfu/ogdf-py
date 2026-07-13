@@ -20,15 +20,19 @@ uv run python demos/layouts_gallery.py
 
 - **`layouts_gallery.py`** - renders graphs with every layout algorithm
   (Sugiyama, FMMM, GEM, Kamada-Kawai, stress minimization, pivot MDS, Schnyder,
-  circular, tree, radial tree, linear/arc, Tutte, dominance, visibility, and
-  orthogonal), one SVG per layout.
+  FPP, planar-straight, planar-draw, mixed-model, circular, tree, radial tree,
+  linear/arc, Tutte, dominance, visibility, multilevel, modular multilevel
+  mixer, balloon, and orthogonal), one SVG per layout.
 - **`styling_showcase.py`** - a wheel graph styled with per-degree node colors,
   ellipse shapes, sizes, labels, and edge arrows.
-- **`algorithms_visual.py`** - visualizes algorithm results by coloring:
-  connected components, a proper node coloring, shortest-path distances (as a
-  gradient), a minimum spanning tree, cut vertices and bridges, a maximum-weight
-  matching, Bellman-Ford distances, a minimum-cost flow (edge width by flow),
-  and a minimum Steiner tree.
+- **`algorithms_visual.py`** - visualizes algorithm results by coloring nodes
+  and edges: connected / strongly-connected / biconnected components, a proper
+  node coloring, Dijkstra and A* shortest paths, Bellman-Ford distances,
+  topological numbering, a minimum spanning tree, minimum-cost flow, s-t minimum
+  cut (with max flow), cut vertices and bridges, node/edge k-connectivity,
+  triconnectivity (separation pair and SPQR summary), a maximum-weight matching,
+  a minimum Steiner tree, the maximal planar subgraph, and crossing minimization
+  (crossing number and edge-insertion routing).
 - **`generators_zoo.py`** - builds a variety of named graphs (complete,
   bipartite, wheel, cube, grid, Petersen, trees, random regular) and draws each.
 - **`io_roundtrip.py`** - writes a graph to GML, GraphML, DOT, GEXF, TLP, SVG,
