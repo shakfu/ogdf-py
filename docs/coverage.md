@@ -4,11 +4,13 @@ This page tracks what OGDF functionality is exposed by `ogdf-py`. It is a living
 
 **Legend:** `[x]` = bound and available in Python, `[ ]` = not (yet) bound. Unbound items scheduled for the next additions may be tagged `**(priority)**`; see the [Priority roadmap](#priority-roadmap).
 
+Most of this page tracks OGDF functionality. The [Python layer](#python-layer) section at the end covers the parts of the API that are *not* a binding of anything - diagnostics, the exception taxonomy, interoperability, and reproducibility - which exist because a faithful binding alone is not a usable Python package.
+
 **Scope rationale.** The binding targets OGDF's genuine differentiators for Python users - **graph drawing** and **planarity** - plus a **core set of common graph algorithms** (even where these overlap networkx/scipy) for a self-contained experience. Because that common-algorithm core is explicitly in scope, canonical routines users reach for next to what is already bound - notably **A\*** (alongside `dijkstra`/`bellman_ford`) - are treated as in-scope gaps to close, not as exotic exclusions. That said, the core covers algorithms OGDF actually implements well: **PageRank** is intentionally omitted because OGDF only ships an undirected, [0, 1]-normalized variant that is degree-dominated and not the canonical directed measure (see below). Genuinely exotic or specialized algorithms, and large subsystems (clustering, UML, hypergraphs, cluster planarity, SEFE), are excluded unless there is concrete demand. Contributions that move an item from `[ ]` to `[x]` are welcome.
 
 ## Priority roadmap
 
-Highest-value gaps given the drawing + planarity focus and the common-algorithm core. Tiers 1 and 2 are complete; nothing is currently scheduled. Future priorities, when chosen, are tagged `**(priority)**` in the sections below.
+Highest-value gaps given the drawing + planarity focus and the common-algorithm core. Tiers 1 through 3 are complete. Future priorities are tagged `**(priority)**` in the sections below.
 
 **Done (Tier 1):**
 
@@ -26,9 +28,25 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 5. **Edge-insertion routing** (`insert_edges`) - routes a chosen set of edges through the rest of the graph (which must be planar once they are removed) and returns, per edge, the original edges it crosses. Uses the variable-embedding inserter with no remove-reinsert, so crossings are attributed cleanly to the inserted edges rather than re-routed across the whole drawing.
 
+**Done (Tier 3 - ergonomics and operational trust):**
+
+6. **Install confidence** - `about()` / `python -m ogdf`, offline and prebuilt-OGDF build paths, a documented support matrix, and stage-specific build failures.
+
+7. **Errors and preconditions** - an exception taxonomy (`OGDFError` and friends), enforcement of every documented precondition, and `validate()` / `graph_report()` helpers.
+
+8. **Python interoperability** - NetworkX and edge-list conversion, array-to-container helpers, and results as ordinary Python collections.
+
+9. **Reproducibility** - seeding for every stochastic operation, `provenance()` metadata, and achieved objective values from the heuristic layouts.
+
+**Next (priority):**
+
+10. **Result ergonomics** - the array-output convention leaves useful information unreported. `dijkstra` and `bellman_ford` already compute a predecessor array internally and discard it, so shortest *paths* (not just distances) are nearly free; `max_flow` should return the source-side partition and `min_st_cut` both sides; and `bellman_ford`'s integer edge lengths should be reconciled with the `double` weights used by `dijkstra` and `a_star_search`.
+
 **Not scheduled:**
 
 - Planarity depth: combinatorial embedding + dual graph, upward planarity testing, planar separators.
+
+- A high-level layout facade (`layout(graph, algorithm=...)` returning a result object). Worth doing only after item 10 settles the shape of a result, or it would be built twice.
 
 ## Graph model and attributes
 
@@ -37,6 +55,8 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 - [x] `NodeArray` / `EdgeArray` (int, double, bool)
 
 - [x] `GraphAttributes`: coordinates, width/height, labels
+
+- [x] `GraphAttributes.graph`, `.has(flags)` (is an attribute group enabled), `.directed`
 
 - [x] Styling: `Color`, `Shape`, `StrokeType`, `FillPattern`, `EdgeArrow`
 
@@ -56,7 +76,7 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 ## Layout algorithms
 
-- [x] `SugiyamaLayout` (layered / hierarchical)
+- [x] `SugiyamaLayout` (layered / hierarchical), with `number_of_crossings()` / `number_of_levels()` from the last call
 
 - [x] `FMMMLayout` (fast multipole multilevel, force-directed)
 
@@ -68,7 +88,7 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 - [x] `PivotMDS`
 
-- [x] `PlanarizationLayout` (with optional orthogonal routing via `OrthoLayout`)
+- [x] `PlanarizationLayout` (with optional orthogonal routing via `OrthoLayout`), with `number_of_crossings()` from the last call
 
 - [x] `SchnyderLayout` (planar straight-line grid)
 
@@ -118,6 +138,8 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 - [x] `is_two_edge_connected`, `is_regular`, `is_arborescence`
 
+- [x] Simplicity: `is_simple`, `is_simple_undirected`, `has_self_loops`
+
 - [x] cut vertices (`cut_vertices`) and bridges (`bridges`)
 
 - [x] `triangulate`, `make_bimodal`
@@ -132,7 +154,7 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 - [x] `is_planar`
 
-- [x] `planar_embed`, `planar_embed_planar_graph`
+- [x] `planar_embed`, `planar_embed_planar_graph`, `represents_comb_embedding` (is an embedding currently in place)
 
 - [x] Maximal planar subgraph (`maximal_planar_subgraph`)
 
@@ -259,6 +281,69 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 - [x] SVG (`draw_svg` / `to_svg`)
 
 - [x] TikZ (`draw_tikz` / `to_tikz`)
+
+## Python layer
+
+Not bindings of OGDF classes, but the API that makes the binding usable from
+Python. Covered in depth in [Getting Started](getting-started.md).
+
+### Diagnostics
+
+- [x] `about()` / `about_text()` / `python -m ogdf` - package and OGDF versions, the pinned OGDF tag the linked libraries were built from, OGDF's compiled-in configuration, platform, compiler, and available capabilities
+
+- [x] `build_info()` - the compiled-in half of the above
+
+### Errors and preconditions
+
+- [x] Exception taxonomy: `OGDFError`, `PreconditionError`, `InvalidGraphError`, `UnsupportedFormatError`, `AlgorithmError` (the argument-shaped ones also subclass `ValueError`, `AlgorithmError` subclasses `RuntimeError`)
+
+- [x] Enforcement of every documented precondition before entering OGDF, whose assertions are compiled out of a release build
+
+- [x] Argument checks: arrays belonging to another graph, `None` nodes, negative weights where non-negative is assumed, source equal to sink
+
+- [x] `requirements()`, `validate()`, `is_valid_for()`, `check()`, `operations()`, `graph_report()`
+
+- [ ] Transactional guarantees for mutating operations that fail partway (currently: preconditions are checked up front, so the mutators either run or do not start)
+
+### Interoperability
+
+- [x] `from_edges` / `to_edges` (edge lists, with a caller-supplied key mapping)
+
+- [x] `from_networkx` / `to_networkx` (all four NetworkX classes; directedness, multiedges, node identity, and layout coordinates handled explicitly). NetworkX is an optional dependency, imported lazily
+
+- [x] Arrays to and from Python containers: `node_array_to_dict`, `edge_array_to_dict`, `node_array_to_list`, `edge_array_to_list`, `fill_node_array`, `fill_edge_array`
+
+- [x] Results as ordinary collections: `nodes_where`, `edges_where`
+
+- [ ] igraph adapters (bind on demand)
+
+- [ ] pandas / polars node and edge tables
+
+- [ ] NumPy views over `NodeArray` / `EdgeArray` without a copy
+
+### Reproducibility
+
+- [x] `set_seed`, `get_seed`, `new_seed`, and the `seeded(n)` context manager over OGDF's process-wide random engine (`seed_random_engine`, `draw_random_seed`)
+
+- [x] `provenance(**settings)` - JSON-serializable metadata recording seed, versions, platform, and algorithm settings
+
+- [x] Achieved objective values from the heuristic layouts, so runs and seeds can be compared numerically
+
+- [ ] A serializable "layout recipe" (graph hash + algorithm + options + seed + versions + output metrics)
+
+### Not yet provided
+
+- [ ] Result objects with named fields (see item 10 of the [Priority roadmap](#priority-roadmap))
+
+- [ ] A high-level `layout(graph, algorithm=...)` facade
+
+- [ ] Coordinate normalization, fit-to-box, and component packing helpers
+
+- [ ] Drawing-quality metrics (edge-length distribution, angular resolution, area, overlap, stress)
+
+- [ ] Themes, palettes, and style-by-attribute helpers
+
+- [ ] Notebook / interactive HTML output beyond the SVG string
 
 ## Excluded subsystems
 

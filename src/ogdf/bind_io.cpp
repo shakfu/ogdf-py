@@ -2,6 +2,7 @@
 // drawing output (SVG, TikZ).
 
 #include "bindings.h"
+#include "errors.h"
 
 #include <nanobind/stl/string.h>
 
@@ -91,7 +92,7 @@ void register_io(nb::module_& m) {
               const std::string ext = lower_extension(path);
               if (std::find(std::begin(kSupported), std::end(kSupported),
                             ext) == std::end(kSupported)) {
-                  throw std::invalid_argument(
+                  throw ogdfpy::UnsupportedFormatError(
                       "write(): unsupported or attribute-incapable extension '." +
                       ext +
                       "'. Supported: gml, dot, gv, graphml, gexf, gdf, tlp, "
@@ -101,7 +102,8 @@ void register_io(nb::module_& m) {
           },
           "graph_attributes"_a, "filename"_a,
           "Write attributes, choosing the format from the file extension. "
-          "Raises ValueError for formats that cannot store attributes.");
+          "Raises UnsupportedFormatError (a ValueError) for formats that "
+          "cannot store attributes.");
 
     // --- drawing output --- //
     m.def("draw_svg",

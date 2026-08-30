@@ -174,6 +174,27 @@ void register_graph(nb::module_& m) {
              "attr"_a = (GraphAttributes::nodeGraphics |
                          GraphAttributes::edgeGraphics),
              nb::keep_alive<1, 2>())
+        // The graph these attributes describe. Held by reference: the
+        // GraphAttributes already keeps its Graph alive (keep_alive above), and
+        // returning a copy would silently detach the two.
+        .def_prop_ro("graph",
+                     [](GraphAttributes& g) -> const Graph& {
+                         return g.constGraph();
+                     },
+                     nb::rv_policy::reference_internal,
+                     "The Graph these attributes describe.")
+        .def("has", [](const GraphAttributes& g, long attr) {
+                 return g.has(attr);
+             },
+             "attr"_a,
+             "True if every flag in `attr` is enabled. Accessing an attribute "
+             "whose flag is off is undefined, so check before reading data "
+             "from an unknown source.")
+        .def_prop_rw("directed",
+                     [](const GraphAttributes& g) { return g.directed(); },
+                     [](GraphAttributes& g, bool b) { g.directed() = b; },
+                     "Whether the graph is written as directed by the file and "
+                     "drawing writers.")
         .def("x", [](GraphAttributes& g, node v) { return g.x(v); }, "node"_a)
         .def("y", [](GraphAttributes& g, node v) { return g.y(v); }, "node"_a)
         .def("set_x", [](GraphAttributes& g, node v, double v2) { g.x(v) = v2; },

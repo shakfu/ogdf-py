@@ -26,6 +26,8 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Choosing a Layout: choosing-a-layout.md
+  - Recipes: recipes.md
   - Coverage: coverage.md
   - Gallery: gallery.md
 

@@ -11,8 +11,10 @@
 
 namespace nb = nanobind;
 
+void register_errors(nb::module_& m);
 void register_graph(nb::module_& m);
 void register_layouts(nb::module_& m);
 void register_algorithms(nb::module_& m);
 void register_io(nb::module_& m);
 void register_generators(nb::module_& m);
+void register_meta(nb::module_& m);

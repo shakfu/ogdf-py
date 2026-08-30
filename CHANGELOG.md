@@ -6,6 +6,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0]
+
+### Added
+
+- `ogdf.about()` and `ogdf.about_text()` (also `python -m ogdf`): an installation diagnostic reporting the package version, the OGDF version and the pinned OGDF tag the linked static libraries were built from, OGDF's compiled-in configuration (system, LP solver, memory manager), the platform, the compiler, and a count and listing of the available capabilities. The pinned tag is baked in at build time, so the report describes the extension actually loaded.
+
+- Offline and locked-down source builds. `scripts/bootstrap_ogdf.py` can now take the OGDF source from a local archive (`--archive`, `OGDF_ARCHIVE`) or an existing checkout (`--source-dir`, `OGDF_SOURCE_DIR`) instead of cloning, and `--offline` / `OGDF_OFFLINE=1` forbids network access outright. CMake accepts `-DOGDF_PREBUILT_DIR=/path/to/ogdf` (or the matching environment variable) to link against a separately built OGDF and skip the bootstrap entirely.
+
+- Documented support matrix: which platform/architecture/CPython combinations have wheels, what a source build requires (tools, disk space, expected build time), and the three offline installation paths.
+
+- CI coverage for the claims above: an `offline-build` job asserting that an offline bootstrap refuses to clone (and says how to vendor the source) and then builds and tests from a vendored checkout with `OGDF_OFFLINE=1`; and wheel tests that now import the wheel, print its installation report, and run the full suite - including the interop layer, by installing the optional `networkx` dependency.
+
+- Exception taxonomy: `OGDFError` and, under it, `PreconditionError` (a `ValueError`), `InvalidGraphError`, `UnsupportedFormatError` (a `ValueError`), and `AlgorithmError` (a `RuntimeError`). The builtin mix-ins keep existing `except ValueError` / `except RuntimeError` code working.
+
+- Consistent precondition enforcement. OGDF documents preconditions but compiles its assertions out of a release build, so violating one was undefined behaviour rather than a diagnosable error. Every wrapper with a documented precondition now checks it first: `SchnyderLayout`, `TreeLayout` (forest), `RadialTreeLayout` (tree), `TutteLayout` (triconnected planar), `DominanceLayout` / `VisibilityLayout` (DAG), `SpringEmbedderKK` (connected), `triangulate` (simple, connected, planar *embedded*), `topological_numbering` (DAG), `min_cut`, `maximum_matching_bipartite`, and `spqr_tree_summary`. The bindings additionally reject arrays belonging to a different graph than the one passed in, `None` node arguments, negative weights where the algorithm assumes non-negative ones (`dijkstra`, `a_star_search`, `max_flow`, `min_cut`, `min_st_cut`, `steiner_tree`), and a source equal to its sink.
+
+- Validation helpers that report instead of raising: `requirements(name)`, `validate(name, graph)` (the unmet requirements, in check order), `is_valid_for(name, graph)`, `check(name, graph)`, `operations()`, and `graph_report(graph)` - a full structural description of a graph in one call. The requirement table mirrors the compiled-in checks, so the two cannot disagree.
+
+- Predicates `is_simple`, `is_simple_undirected`, `has_self_loops`, and `represents_comb_embedding` (whether a planar embedding is currently in place).
+
+- Python interoperability layer. `from_edges` / `to_edges` build a graph from - and report it back as - an ordinary edge list, returning a mapping from the caller's own keys to `Node` handles; extra tuple entries are ignored so a weighted `(u, v, w)` list works unchanged, and parallel edges and self-loops are preserved.
+
+- `from_networkx` / `to_networkx` for all four NetworkX classes, with explicit handling of directedness, multiedges, node identity, and layout coordinates. `from_networkx(graph_attributes=True)` also returns a `GraphAttributes` whose `directed` flag matches the input and can copy a NetworkX node attribute into the node labels; `to_networkx` picks a lossless NetworkX class by default and copies `x`, `y`, `width`, `height`, and `label` back out, making a laid-out OGDF drawing directly plottable. NetworkX is an optional dependency, imported lazily.
+
+- Array conversion helpers: `node_array_to_dict`, `edge_array_to_dict`, `node_array_to_list`, `edge_array_to_list`, `fill_node_array`, and `fill_edge_array` - keyed by `node.index` / `edge.index` by default, or by a caller-supplied mapping, with a documented node-identity policy.
+
+- Result helpers `nodes_where` and `edges_where`, which turn the boolean-array output convention into ordinary Python lists of nodes or edges (a spanning tree, a matching, a cut).
+
+- `GraphAttributes.graph` (the graph being described), `GraphAttributes.has(flags)` (whether an attribute group is enabled before reading it), and a readable/writable `GraphAttributes.directed`.
+
+- Reproducibility. `set_seed`, `get_seed`, `new_seed`, and the `seeded(n)` context manager wrap OGDF's process-wide random engine, making every stochastic generator, layout, and heuristic reproducible from a recorded seed. `provenance(**settings)` returns JSON-serializable metadata - seed, package version, OGDF version and pinned tag, platform, and the algorithm settings passed in - to store alongside a result. Documented what is and is not guaranteed: same seed and same build reproduce a result exactly; across platforms, compilers, or OGDF versions they do not.
+
+- Heuristic algorithms now report their achieved objective value: `SugiyamaLayout.number_of_crossings()` and `.number_of_levels()`, and `PlanarizationLayout.number_of_crossings()`, so runs and seeds can be compared numerically.
+
+- Reproducibility tests asserting that a seed reproduces both the generated graph and its coordinates, and that different seeds diverge.
+
+- Documentation: a layout selection guide (`docs/choosing-a-layout.md`) organising all nineteen layouts by graph structure, constraint, scale, and intended output, with guidance on directedness, disconnected graphs, multigraphs, determinism, and how to compare candidates numerically; and four end-to-end recipes (`docs/recipes.md`) - NetworkX to SVG, DAG to layered SVG, planar graph to TikZ, and a weighted graph to an annotated drawing. Every recipe is executed by `tests/test_recipes.py` so it cannot silently rot.
+
+- Low-level `seed_random_engine` and `draw_random_seed` bindings, wrapped by `set_seed` / `new_seed`.
+
+- Tests for invalid, empty, disconnected, cyclic, non-planar, non-bipartite, negative-weight, cross-graph-array, and duplicate-endpoint inputs.
+
+### Changed
+
+- `docs/coverage.md` now records the Python layer that is not a binding of anything - diagnostics, the exception taxonomy, interoperability, and reproducibility - alongside the OGDF inventory, and its priority roadmap names result ergonomics as the next item: `dijkstra` and `bellman_ford` already compute predecessor arrays internally and discard them, `max_flow` reports no source-side partition, and `bellman_ford`'s integer edge lengths are still inconsistent with the `double` weights used by `dijkstra` and `a_star_search`.
+
+- `__version__` is single-sourced from the installed distribution metadata (falling back to the version CMake compiled into the extension) instead of being duplicated in `src/ogdf/__init__.py`. Both derive from `pyproject.toml`, and `tests/test_about.py` asserts they agree, so a stale extension now fails the suite.
+
+- Build failures now identify the failing stage. The bootstrap distinguishes a missing tool, a failed source fetch, a failed CMake configuration (typically no C++17 compiler), and a failed compilation; CMake names which of the OGDF and COIN static libraries is missing and tailors the remedy to whether a prebuilt tree or offline mode was requested.
+
+- The pinned OGDF tag now lives in a single place, `scripts/ogdf-tag.txt`, read by both the bootstrap script and CMake, so the tag reported by `ogdf.about()` cannot drift from the libraries that were linked.
+
 ## [0.3.0]
 
 ### Added

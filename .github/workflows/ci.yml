@@ -27,7 +27,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: thirdparty/ogdf
-          key: ogdf-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py') }}
+          key: ogdf-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py', 'scripts/ogdf-tag.txt') }}
 
       - name: Bootstrap OGDF
         run: python3 scripts/bootstrap_ogdf.py
@@ -62,6 +62,49 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  offline-build:
+    name: Offline source build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.3.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      # Without a vendored source, an offline bootstrap must fail fast and say
+      # how to supply one - rather than silently reaching for the network.
+      - name: Offline bootstrap refuses to clone
+        run: |
+          set +e
+          output=$(uv run python scripts/bootstrap_ogdf.py --offline 2>&1)
+          status=$?
+          echo "$output"
+          test $status -ne 0 || { echo 'expected a non-zero exit'; exit 1; }
+          echo "$output" | grep -q 'network access is disabled'
+
+      # Vendor the source once, then build from it with the network path unused.
+      - name: Vendor the OGDF source
+        run: uv run python scripts/bootstrap_ogdf.py --clone-only
+
+      - name: Build from the vendored source with OGDF_OFFLINE set
+        env:
+          OGDF_OFFLINE: '1'
+        run: |
+          uv run python scripts/bootstrap_ogdf.py
+          uv sync --dev
+
+      - name: Smoke-test the offline build
+        env:
+          OGDF_OFFLINE: '1'
+        run: |
+          uv run python -m ogdf
+          uv run pytest tests/ -q
+
   windows:
     name: Build & test (Windows)
     runs-on: windows-latest
@@ -74,7 +117,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: thirdparty/ogdf
-          key: ogdf-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py') }}
+          key: ogdf-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py', 'scripts/ogdf-tag.txt') }}
 
       - name: Bootstrap OGDF
         run: python scripts/bootstrap_ogdf.py
@@ -88,7 +131,10 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies (builds the extension)
-        run: uv sync
+        run: uv sync --dev
 
       - name: Run tests
         run: uv run pytest tests/ -v
+
+      - name: Installation report
+        run: uv run python -m ogdf

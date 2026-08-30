@@ -1,6 +1,7 @@
 // Layout algorithms and the enums that configure them.
 
 #include "bindings.h"
+#include "errors.h"
 
 #include <cmath>
 #include <stdexcept>
@@ -71,19 +72,9 @@ static void seed_circle_if_degenerate(GraphAttributes& ga) {
 // undefined behaviour in a release build.
 static void require_simple_planar(const GraphAttributes& ga, const char* name) {
     const Graph& g = ga.constGraph();
-    if (g.numberOfNodes() < 3) {
-        throw std::invalid_argument(std::string(name) +
-                                    " requires at least 3 nodes");
-    }
-    if (!isSimpleUndirected(g)) {
-        throw std::invalid_argument(std::string(name) +
-                                    " requires a simple graph (no self-loops or "
-                                    "parallel edges)");
-    }
-    if (!isPlanar(g)) {
-        throw std::invalid_argument(std::string(name) +
-                                    " requires a planar graph");
-    }
+    ogdfpy::require_min_nodes(g, 3, name);
+    ogdfpy::require_simple(g, name);
+    ogdfpy::require_planar(g, name);
 }
 
 void register_layouts(nb::module_& m) {
@@ -116,7 +107,16 @@ void register_layouts(nb::module_& m) {
         .def("set_transpose",
              [](SugiyamaLayout& s, bool b) { s.transpose(b); }, "value"_a)
         .def("set_arrange_ccs",
-             [](SugiyamaLayout& s, bool b) { s.arrangeCCs(b); }, "value"_a);
+             [](SugiyamaLayout& s, bool b) { s.arrangeCCs(b); }, "value"_a)
+        // Sugiyama is heuristic; these report what the last call actually
+        // achieved, so a caller can compare runs or seeds instead of judging
+        // the result by eye.
+        .def("number_of_crossings",
+             [](const SugiyamaLayout& s) { return s.numberOfCrossings(); },
+             "Edge crossings in the layout produced by the last `call`.")
+        .def("number_of_levels",
+             [](SugiyamaLayout& s) { return s.numberOfLevels(); },
+             "Layers in the layout produced by the last `call`.");
 
     nb::class_<FMMMLayout>(m, "FMMMLayout")
         .def(nb::init<>())
@@ -150,11 +150,22 @@ void register_layouts(nb::module_& m) {
                  p.setPlanarLayouter(ortho);
              },
              "separation"_a = 40.0,
-             "Use an orthogonal (right-angle) planar layouter.");
+             "Use an orthogonal (right-angle) planar layouter.")
+        .def("number_of_crossings",
+             [](const PlanarizationLayout& p) {
+                 return p.numberOfCrossings();
+             },
+             "Edge crossings in the layout produced by the last `call`. "
+             "Planarization is heuristic, so this is the achieved objective "
+             "value, not a proven minimum.");
 
     nb::class_<TreeLayout>(m, "TreeLayout")
         .def(nb::init<>())
-        .def("call", [](TreeLayout& t, GraphAttributes& g) { t.call(g); },
+        .def("call",
+             [](TreeLayout& t, GraphAttributes& g) {
+                 ogdfpy::require_forest(g.constGraph(), "TreeLayout");
+                 t.call(g);
+             },
              "graph_attributes"_a,
              "Compute a tree layout (requires a tree/forest).")
         .def("set_sibling_distance",
@@ -233,6 +244,7 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](SpringEmbedderKK& s, GraphAttributes& g) {
+                 ogdfpy::require_connected(g.constGraph(), "SpringEmbedderKK");
                  seed_circle_if_degenerate(g);
                  s.call(g);
              },
@@ -254,7 +266,11 @@ void register_layouts(nb::module_& m) {
     // planar, simple, and to have at least 3 nodes.
     nb::class_<SchnyderLayout>(m, "SchnyderLayout")
         .def(nb::init<>())
-        .def("call", [](SchnyderLayout& s, GraphAttributes& g) { s.call(g); },
+        .def("call",
+             [](SchnyderLayout& s, GraphAttributes& g) {
+                 require_simple_planar(g, "SchnyderLayout");
+                 s.call(g);
+             },
              "graph_attributes"_a,
              "Compute a Schnyder straight-line planar grid layout (requires a "
              "simple planar graph with at least 3 nodes).");
@@ -344,7 +360,11 @@ void register_layouts(nb::module_& m) {
 
     nb::class_<RadialTreeLayout>(m, "RadialTreeLayout")
         .def(nb::init<>())
-        .def("call", [](RadialTreeLayout& l, GraphAttributes& g) { l.call(g); },
+        .def("call",
+             [](RadialTreeLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_tree(g.constGraph(), "RadialTreeLayout");
+                 l.call(g);
+             },
              "graph_attributes"_a,
              "Compute a radial tree layout (requires a tree).")
         .def("set_level_distance",
@@ -367,7 +387,14 @@ void register_layouts(nb::module_& m) {
     // Requires a triconnected (planar) graph.
     nb::class_<TutteLayout>(m, "TutteLayout")
         .def(nb::init<>())
-        .def("call", [](TutteLayout& l, GraphAttributes& g) { l.call(g); },
+        .def("call",
+             [](TutteLayout& l, GraphAttributes& g) {
+                 const Graph& graph = g.constGraph();
+                 ogdfpy::require_min_nodes(graph, 3, "TutteLayout");
+                 ogdfpy::require_planar(graph, "TutteLayout");
+                 ogdfpy::require_triconnected(graph, "TutteLayout");
+                 l.call(g);
+             },
              "graph_attributes"_a,
              "Compute a Tutte barycentric convex planar layout (requires a "
              "triconnected planar graph).");
@@ -376,7 +403,12 @@ void register_layouts(nb::module_& m) {
     // the input to an upward-planar representation.
     nb::class_<DominanceLayout>(m, "DominanceLayout")
         .def(nb::init<>())
-        .def("call", [](DominanceLayout& l, GraphAttributes& g) { l.call(g); },
+        .def("call",
+             [](DominanceLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_non_empty(g.constGraph(), "DominanceLayout");
+                 ogdfpy::require_acyclic(g.constGraph(), "DominanceLayout");
+                 l.call(g);
+             },
              "graph_attributes"_a,
              "Compute an upward dominance drawing (for a DAG).")
         .def("set_min_grid_distance",
@@ -385,7 +417,12 @@ void register_layouts(nb::module_& m) {
 
     nb::class_<VisibilityLayout>(m, "VisibilityLayout")
         .def(nb::init<>())
-        .def("call", [](VisibilityLayout& l, GraphAttributes& g) { l.call(g); },
+        .def("call",
+             [](VisibilityLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_non_empty(g.constGraph(), "VisibilityLayout");
+                 ogdfpy::require_acyclic(g.constGraph(), "VisibilityLayout");
+                 l.call(g);
+             },
              "graph_attributes"_a,
              "Compute an upward visibility drawing (for a DAG).")
         .def("set_min_grid_distance",
@@ -423,10 +460,7 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](BalloonLayout& l, GraphAttributes& g) {
-                 if (!isConnected(g.constGraph())) {
-                     throw std::invalid_argument(
-                         "BalloonLayout requires a connected graph");
-                 }
+                 ogdfpy::require_connected(g.constGraph(), "BalloonLayout");
                  l.call(g);
              },
              "graph_attributes"_a,

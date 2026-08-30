@@ -1,6 +1,6 @@
 [project]
 name = "ogdf-py"
-version = "0.3.0"
+version = "0.4.0"
 description = "Python bindings for the Open Graph Drawing Framework (OGDF), built with nanobind."
 readme = "README.md"
 license = { text = "MIT" }
@@ -24,6 +24,8 @@ classifiers = [
 [dependency-groups]
 dev = [
     "mypy>=2.1.0",
+    # Optional at runtime; installed for tests so the interop layer is covered.
+    "networkx>=3.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.20",
@@ -53,3 +55,9 @@ sdist.exclude = []
 # Don't ship the C++ source inside the binary wheel.
 wheel.exclude = ["**/_core.cpp"]
 
+
+# networkx is an optional runtime dependency and ships no type stubs; the
+# interop layer imports it lazily and works without it.
+[[tool.mypy.overrides]]
+module = ["networkx.*"]
+ignore_missing_imports = true

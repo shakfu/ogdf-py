@@ -36,8 +36,14 @@ env:
   # the MSVC toolchain.
   CIBW_BEFORE_ALL_WINDOWS: python scripts/bootstrap_ogdf.py
   # Exercise each wheel end-to-end (import + layouts + I/O).
-  CIBW_TEST_REQUIRES: pytest
-  CIBW_TEST_COMMAND: pytest {project}/tests -v
+  # networkx is an optional runtime dependency; install it so the wheel test
+  # actually exercises the interop layer instead of skipping it.
+  CIBW_TEST_REQUIRES: pytest networkx
+  # Import, the installation report, and the full suite (layouts, algorithms,
+  # I/O, interop, recipes) against the built wheel rather than the source tree.
+  CIBW_TEST_COMMAND: >-
+    python -c "import ogdf; print(ogdf.about_text())" &&
+    pytest {project}/tests -v
 
 jobs:
   build-sdist:

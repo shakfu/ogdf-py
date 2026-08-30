@@ -41,6 +41,18 @@ ogdf.draw_svg(ga, "graph.svg")
 
 - **File I/O** - GML, GraphML, DOT, GEXF, GDF, TLP interchange, plus SVG and TikZ drawing output.
 
-See [Getting Started](getting-started.md) for a fuller tour, the
-[Gallery](gallery.md) for example drawings, and [Coverage](coverage.md) for
-exactly what is included.
+- **Python interoperability** - NetworkX and edge-list conversion, array-to-dict helpers, and results as ordinary Python lists.
+
+- **Checked preconditions** - a typed exception taxonomy, and `validate()` / `graph_report()` to inspect an input before calling.
+
+- **Reproducibility** - seeding for every stochastic operation, and `provenance()` metadata to record alongside a result.
+
+## Where to go next
+
+- [Getting Started](getting-started.md) - installation, the graph model, interoperability, errors, and reproducibility.
+- [Choosing a Layout](choosing-a-layout.md) - which of the nineteen layouts fits your graph, and why.
+- [Recipes](recipes.md) - four complete workflows, from NetworkX to SVG to annotated drawings.
+- [Gallery](gallery.md) - example drawings.
+- [Coverage](coverage.md) - exactly what is and is not included.
+
+Run `python -m ogdf` to print an installation report (versions, platform, capabilities) for a bug report.
