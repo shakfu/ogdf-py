@@ -235,7 +235,44 @@ void register_algorithms(nb::module_& m) {
           },
           "graph"_a, "weight"_a, "source"_a, "distance"_a,
           "directed"_a = false,
-          "Single-source shortest paths; writes distances into `distance`.");
+          "Single-source shortest paths (Dijkstra; exact, requires non-negative "
+          "weights). Writes distances into `distance`; an unreachable node gets "
+          "the sentinel sys.float_info.max, not infinity. With `directed` False "
+          "every edge is usable in both directions. Parallel edges are honoured "
+          "individually, so the cheapest one wins. Use `shortest_paths()` for "
+          "the paths themselves.");
+
+    // Low-level primitive behind `shortest_paths()`: the same computation, but
+    // also reporting the shortest-path tree that Dijkstra builds internally and
+    // that the array-output form above discards.
+    m.def("dijkstra_tree",
+          [](const Graph& g, const EdgeArray<double>& weight, node source,
+             bool directed) {
+              ogdfpy::require_node(source, "dijkstra_tree", "source");
+              ogdfpy::require_same_graph(weight, g, "dijkstra_tree", "weight");
+              ogdfpy::require_non_negative(weight, g, "dijkstra_tree", "weight");
+              NodeArray<edge> predecessor(g);
+              NodeArray<double> distance(g);
+              Dijkstra<double>().call(g, weight, source, predecessor, distance,
+                                      directed);
+              // Parallel lists in node iteration order; the Python layer keys
+              // them by node index.
+              nb::list distances;
+              nb::list predecessors;
+              for (node v : g.nodes) {
+                  distances.append(distance[v]);
+                  predecessors.append(
+                      predecessor[v] == nullptr
+                          ? nb::none()
+                          : nb::cast(predecessor[v], nb::rv_policy::reference));
+              }
+              return nb::make_tuple(distances, predecessors);
+          },
+          "graph"_a, "weight"_a, "source"_a, "directed"_a = false,
+          "Dijkstra returning (distances, predecessor_edges) as lists in node "
+          "iteration order. The predecessor of the source, and of every "
+          "unreachable node, is None. Prefer `shortest_paths()`, which wraps "
+          "this in a result object.");
     m.def("bfs_distances",
           [](const Graph& g, node source, NodeArray<int>& distance) {
               ogdfpy::require_node(source, "bfs_distances", "source");
@@ -244,8 +281,11 @@ void register_algorithms(nb::module_& m) {
               bfs_SPSS<int>(source, g, distance, 1);
           },
           "graph"_a, "source"_a, "distance"_a,
-          "Unweighted single-source distances (edge hops) via BFS; writes the "
-          "hop count to each node into `distance`.");
+          "Unweighted single-source distances (BFS; exact) in edge hops, "
+          "written into `distance`. Edges are treated as undirected. "
+          "Unreachable nodes keep the array's initial value, so initialise it "
+          "with a sentinel you can recognise; `shortest_paths()` reports "
+          "unreachability explicitly instead.");
 
     // ---------------------------------------------------------------- //
     // Minimum spanning tree                                            //
@@ -260,8 +300,10 @@ void register_algorithms(nb::module_& m) {
               return computeMinST(g, weight, in_tree);
           },
           "graph"_a, "weight"_a, "in_tree"_a,
-          "Minimum spanning tree (Prim). Returns total weight; marks tree "
-          "edges in `in_tree`. Does not modify the graph.");
+          "Minimum spanning tree (Prim; exact). Returns total weight; marks "
+          "tree edges in `in_tree`, which `edges_where()` turns into a list. "
+          "Edge direction is ignored. On a disconnected graph this yields a "
+          "minimum spanning *forest*. Does not modify the graph.");
     m.def("make_minimum_spanning_tree",
           [](Graph& g, const EdgeArray<double>& weight) {
               ogdfpy::require_same_graph(weight, g,
@@ -289,8 +331,12 @@ void register_algorithms(nb::module_& m) {
               return mf.computeFlow(cap, s, t, flow);
           },
           "graph"_a, "capacity"_a, "source"_a, "sink"_a, "flow"_a,
-          "Maximum s-t flow (Goldberg-Tarjan). Returns the flow value; writes "
-          "per-edge flow into `flow`.");
+          "Maximum s-t flow (Goldberg-Tarjan; exact, requires non-negative "
+          "capacities). Returns the flow value and writes the per-edge flow "
+          "into `flow`. Edge direction is honoured and parallel edges carry "
+          "flow independently. OGDF's max-flow module reports no cut; "
+          "`min_st_cut()` gives the corresponding cut edges, and by max-flow "
+          "min-cut duality its `value` equals the value returned here.");
     m.def("min_cut",
           [](const Graph& g, const EdgeArray<double>& weight) {
               ogdfpy::require_min_nodes(g, 2, "min_cut");
@@ -300,19 +346,29 @@ void register_algorithms(nb::module_& m) {
               return mc.call(g, weight);
           },
           "graph"_a, "weight"_a,
-          "Global minimum cut value (Stoer-Wagner) for an undirected weighted "
-          "graph.");
-    m.def("min_st_cut",
+          "Global minimum cut value (Stoer-Wagner; exact) for an undirected "
+          "weighted graph with non-negative weights. Returns the value only - "
+          "use `min_st_cut()` when you need the cut edges or the partition.");
+    m.def("st_cut",
           [](const Graph& g, const EdgeArray<double>& weight, node s, node t,
              bool directed) {
-              ogdfpy::require_node(s, "min_st_cut", "source");
-              ogdfpy::require_node(t, "min_st_cut", "sink");
-              ogdfpy::require_distinct(s, t, "min_st_cut");
-              ogdfpy::require_same_graph(weight, g, "min_st_cut", "weight");
-              ogdfpy::require_non_negative(weight, g, "min_st_cut", "weight");
+              ogdfpy::require_node(s, "st_cut", "source");
+              ogdfpy::require_node(t, "st_cut", "sink");
+              ogdfpy::require_distinct(s, t, "st_cut");
+              ogdfpy::require_same_graph(weight, g, "st_cut", "weight");
+              ogdfpy::require_non_negative(weight, g, "st_cut", "weight");
               // Cut edges are those leaving the source side; treatAsUndirected
               // is the inverse of `directed`. With directed=True the cut value
               // equals the directed max flow (max-flow min-cut duality).
+              //
+              // MinSTCutMaxFlow also exposes isInFrontCut()/isInBackCut(), but
+              // those are NOT the two sides of the cut returned here: when the
+              // minimum cut is not unique they describe the extreme cuts
+              // nearest s and nearest t, which are different cuts, and neither
+              // is guaranteed to correspond to this edge list. On the complete
+              // digraph K20 the front cut is {s} while the returned edges are
+              // the sink's in-edges. So the partition is deliberately not
+              // reported - see the note in the docs.
               List<edge> cut;
               MinSTCutMaxFlow<double> mc(/*treatAsUndirected=*/!directed);
               mc.call(g, weight, s, t, cut);
@@ -325,10 +381,10 @@ void register_algorithms(nb::module_& m) {
               return nb::make_tuple(value, edges);
           },
           "graph"_a, "weight"_a, "source"_a, "sink"_a, "directed"_a = true,
-          "Minimum s-t cut. Returns (cut_value, [cut_edges]) where the edges "
-          "are those crossing from the source side to the sink side. With "
-          "`directed` (the default) the value equals the directed maximum flow "
-          "from source to sink; set it False to treat edges as undirected.");
+          "Minimum s-t cut (exact, requires non-negative weights) returning "
+          "(value, cut_edges). A minimum cut need not be unique; which one is "
+          "reported is OGDF's choice. Prefer `min_st_cut()`, which wraps this "
+          "in a result object with named fields.");
 
     // ---------------------------------------------------------------- //
     // Matching                                                         //
@@ -343,7 +399,11 @@ void register_algorithms(nb::module_& m) {
               }
               return out;
           },
-          "graph"_a, "Return a maximal matching as a list of edges.");
+          "graph"_a,
+          "A maximal matching as a list of edges (greedy; maximal, meaning no "
+          "edge can be added - not maximum cardinality. Use "
+          "`maximum_weight_matching` or `maximum_matching_bipartite` for an "
+          "optimal one).");
     m.def("maximum_matching_bipartite",
           [](const Graph& g, EdgeArray<bool>& matching) {
               NodeArray<bool> color(g);
@@ -388,8 +448,10 @@ void register_algorithms(nb::module_& m) {
               return static_cast<int>(k);
           },
           "graph"_a, "colors"_a,
-          "Heuristic proper node coloring (Recursive Largest First). Returns "
-          "the number of colors; writes each node's color into `colors`.");
+          "Proper node colouring (Recursive Largest First; heuristic - the "
+          "colour count is an upper bound, not the chromatic number). Returns "
+          "the number of colours used; writes each node's colour into "
+          "`colors`.");
 
     // ---------------------------------------------------------------- //
     // Cut vertices and bridges                                         //
@@ -438,9 +500,41 @@ void register_algorithms(nb::module_& m) {
                                                 predecessor);
           },
           "graph"_a, "source"_a, "length"_a, "distance"_a,
-          "Bellman-Ford single-source shortest paths on a directed graph with "
-          "integer (possibly negative) edge lengths. Returns False if a "
-          "negative cycle exists; writes distances into `distance`.");
+          "Bellman-Ford single-source shortest paths (exact) on a directed "
+          "graph with integer (possibly negative) edge lengths. Returns False "
+          "if a negative cycle exists; writes distances into `distance`. Edge "
+          "direction is always honoured - unlike `dijkstra`, there is no "
+          "undirected mode. Lengths are integers because OGDF's shortest-path "
+          "module interface is defined over int; `dijkstra` and "
+          "`a_star_search` take doubles, but neither admits negative weights. "
+          "Use `shortest_paths(algorithm=\'bellman_ford\')` for the paths.");
+
+    // Low-level primitive behind `shortest_paths(algorithm="bellman_ford")`.
+    m.def("bellman_ford_tree",
+          [](const Graph& g, node source, const EdgeArray<int>& length) {
+              ogdfpy::require_node(source, "bellman_ford_tree", "source");
+              ogdfpy::require_same_graph(length, g, "bellman_ford_tree",
+                                         "length");
+              NodeArray<edge> predecessor(g);
+              NodeArray<int> distance(g);
+              const bool ok = ShortestPathWithBFM().call(g, source, length,
+                                                         distance, predecessor);
+              nb::list distances;
+              nb::list predecessors;
+              for (node v : g.nodes) {
+                  distances.append(distance[v]);
+                  predecessors.append(
+                      predecessor[v] == nullptr
+                          ? nb::none()
+                          : nb::cast(predecessor[v], nb::rv_policy::reference));
+              }
+              return nb::make_tuple(ok, distances, predecessors);
+          },
+          "graph"_a, "source"_a, "length"_a,
+          "Bellman-Ford returning (ok, distances, predecessor_edges), the "
+          "lists in node iteration order. `ok` is False if a negative cycle "
+          "exists, in which case the other two are meaningless. Prefer "
+          "`shortest_paths()`.");
 
     // ---------------------------------------------------------------- //
     // A* search (point-to-point shortest path)                         //
@@ -512,8 +606,9 @@ void register_algorithms(nb::module_& m) {
               return total;
           },
           "graph"_a, "weight"_a, "matching"_a,
-          "Maximum-weight general matching (Blossom V). Returns the total "
-          "weight; marks matched edges in `matching`.");
+          "Maximum-weight general matching (Blossom V; exact). Returns the "
+          "total weight and marks matched edges in `matching`, which "
+          "`edges_where()` turns into a list. Edge direction is ignored.");
 
     // ---------------------------------------------------------------- //
     // Minimum-cost flow                                                //
@@ -583,8 +678,10 @@ void register_algorithms(nb::module_& m) {
               return nb::make_tuple(total, edges);
           },
           "graph"_a, "weight"_a, "terminals"_a,
-          "Minimum Steiner tree (Mehlhorn) connecting the given terminal "
-          "nodes. Returns (total_weight, [tree_edges]).");
+          "Minimum Steiner tree connecting the given terminals (Mehlhorn; a "
+          "2-approximation, not exact). Requires non-negative weights and "
+          "ignores edge direction; duplicate terminals are collapsed. Returns "
+          "(total_weight, [tree_edges]).");
 
     // ---------------------------------------------------------------- //
     // Maximal planar subgraph                                          //

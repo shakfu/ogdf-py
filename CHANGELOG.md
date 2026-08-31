@@ -6,6 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+**Results**
+
+- Result objects, alongside the existing array-output functions rather than replacing them. `shortest_paths(graph, source, weight=None, *, directed=False, algorithm="auto")` returns a `ShortestPaths` with `distance()`, `path_to()`, `nodes_to()`, `predecessor_edge()`, `reachable()`, `unreachable_nodes()`, and `distances()`. `dijkstra` and `bellman_ford` were already building the shortest-path tree internally and discarding it; this keeps it. Unreachable nodes report `math.inf` and `None` instead of OGDF's raw sentinel, and `algorithm="auto"` picks Bellman-Ford when an `EdgeArrayInt` holds a negative length, Dijkstra otherwise. A reachable negative cycle raises `AlgorithmError` rather than returning meaningless distances.
+
+- `min_st_cut` now returns an `STCut` named tuple, so the value and edges are reachable by name (`cut.value`, `cut.edges`) as well as by unpacking. The return shape is unchanged, so existing `value, edges = min_st_cut(...)` code keeps working.
+
+- Low-level primitives behind the above: `dijkstra_tree`, `bellman_ford_tree`, and `st_cut`.
+
+**Placing a drawing**
+
+- Coordinate transforms for placing a finished drawing: `translate`, `center`, `normalize` (lower-left corner to the origin), `scale` (about the centre, the origin, the lower-left corner, or an explicit point), `fit_to_box`, and `pack_components`. Every one moves edge bend points as well as node coordinates, so a drawing produced by a routing layout is not torn apart - which is also why they are implemented natively, since bends are otherwise only reachable through `add_bend` / `clear_bends`.
+
+- `scale` leaves node sizes alone by default, since scaling up is usually how overlapping nodes get separated; `scale_node_sizes=True` scales the whole picture. `fit_to_box` preserves aspect ratio, returns the factor it applied, and scales node sizes by default so the fit is exact; with `scale_node_sizes=False` the factor is solved for by bisection rather than estimated, so the fit stays exact while node boxes keep their size.
+
+- `pack_components` arranges disconnected components side by side instead of piled at a common origin, binding OGDF's `TileToRowsCCPacker`. Returns the component count and leaves a connected graph untouched.
+
+**Measuring a drawing**
+
+- Drawing-quality metrics, so layouts can be compared on numbers instead of by eye: `count_crossings`, `edge_lengths`, `bounding_box`, `node_overlaps`, `min_angle` (angular resolution), and `stress`. All are computed over the drawn polylines, so edge bends are respected rather than treated as straight lines.
+
+- `drawing_metrics(attributes)` aggregates them into one plain dict - crossings, the edge-length distribution and its scale-free coefficient of variation, width/height/area/aspect ratio, node overlap, angular resolution, and stress - ready to serialize alongside `provenance()`.
+
+- `compare_layouts(graph, layouts, *, seed=None)` runs several layouts on one graph, each with a fresh `GraphAttributes`, and returns their metrics ranked by crossings then stress. A layout whose preconditions the graph fails is reported with an `error` key and sorted last instead of aborting the comparison; `seed` makes randomized layouts comparable like for like.
+
+**Workflow**
+
+- `layout(graph, algorithm=FMMMLayout, **options)` - one call from a graph to a placed drawing, composing precondition checks, seeding, the layout itself, optional component packing, and fit-to-box. The algorithm is a class by default, so it stays completable in an editor and checkable by mypy; a string is accepted for config-driven use, with `layout_names()` listing what resolves. Options are forwarded to the layout's setters through a mechanical `set_X` mapping derived from the bindings, so it cannot drift, and an unknown option raises `TypeError` naming what that layout does accept. Returns the `GraphAttributes`; metrics and provenance are deliberately left as separate calls, since the metrics are quadratic.
+
+**Documentation and tests**
+
+- Documentation: a Drawing Metrics page explaining what each metric means and how to read it, and the layout selection guide's comparison example now uses `compare_layouts` instead of a hand-rolled loop.
+
+- Documented how the metrics read on real drawings: self-loops contribute length 0 (a straight-line drawing gives them no extent), `min_angle` is a worst case that a single pair of collinear edges sends to 0, and `stress` is a sum over node pairs so it grows with the graph and should only be compared between layouts of the same graph.
+
+- `tests/test_docs.py` verifies the concrete output values printed in the documentation - the capability counts in the sample installation report, the `drawing_metrics` example, the recipe's build order, and the small inline `# result` comments - by re-deriving each and comparing.
+
+- Documentation: a `layout()` section in the getting-started guide, a Placing the drawing section on the metrics page covering the transforms, and a `coverage.md` reorganised so the Python layer lists results, placement, measurement, and workflow as their own groups rather than filing completed work under "not yet provided".
+
+### Changed
+
+- `min_st_cut` deliberately does **not** report the node partition, and the documentation says why. OGDF's `MinSTCutMaxFlow` exposes `isInFrontCut` / `isInBackCut`, which look like the two sides of the cut but are the extreme minimum cuts nearest the source and nearest the sink. When the minimum cut is not unique those are different cuts, and neither is guaranteed to correspond to the edge list returned alongside them - on the complete digraph on 20 nodes the front cut is `{s}` while the returned edges are the sink's in-edges, so the two together describe no single cut. Callers who need the partition should derive it from the cut edges, which is consistent by construction; a test asserts that removing them really does separate source from sink.
+
+- Algorithm docstrings now state provenance and conventions: whether the result is exact, heuristic, or approximate (`node_coloring` is a heuristic upper bound, `steiner_tree` a 2-approximation, `maximal_matching` maximal but not maximum), whether edge direction is honoured, how parallel edges are treated, and what an unreachable node's sentinel is.
+
+- `bellman_ford` keeps integer edge lengths while `dijkstra` and `a_star_search` take doubles. This inconsistency is now documented rather than removed: OGDF's `ShortestPathModule` interface is defined over `int` and ships no floating-point Bellman-Ford, so closing the gap would mean reimplementing the algorithm instead of binding one - and the two are not interchangeable anyway, since Dijkstra rejects the negative weights Bellman-Ford exists for. `shortest_paths()` accepts either array type.
+
+### Fixed
+
+- Two documentation examples stated values that were never produced by running them: the `drawing_metrics` output in `docs/metrics.md` was written by hand rather than measured, and the topological order in the DAG recipe was a valid ordering but not the one the snippet prints. Both are now the real output, and `tests/test_docs.py` checks them.
+
+- The capability counts in the sample `python -m ogdf` report had gone stale as more functions were bound (82/18/22 rather than the current 99/19/27).
+
 ## [0.4.0]
 
 ### Added

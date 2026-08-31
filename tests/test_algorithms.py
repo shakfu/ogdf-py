@@ -154,22 +154,22 @@ def test_min_st_cut_matches_max_flow():
     e3 = g.new_edge(s, t)
     cap = ogdf.EdgeArrayDouble(g)
     cap[e1], cap[e2], cap[e3] = 3.0, 2.0, 5.0
-    value, edges = ogdf.min_st_cut(g, cap, s, t)
+    cut = ogdf.min_st_cut(g, cap, s, t)
     # Max-flow min-cut duality: the cut value equals the max flow (7).
     flow = ogdf.EdgeArrayDouble(g)
-    assert value == ogdf.max_flow(g, cap, s, t, flow) == 7.0
+    assert cut.value == ogdf.max_flow(g, cap, s, t, flow) == 7.0
     # The min cut severs a->t (2) and s->t (5); the cut-edge weights sum to it.
-    assert sum(cap[e] for e in edges) == value
-    assert {e.index for e in edges} == {e2.index, e3.index}
+    assert sum(cap[e] for e in cut.edges) == cut.value
+    assert {e.index for e in cut.edges} == {e2.index, e3.index}
 
 
 def test_min_st_cut_undirected():
     # Two parallel-in-series paths between s and t; undirected cut is 2.
     c, nodes = cycle(4)  # s - x - t - y - s
     weight = ogdf.EdgeArrayDouble(c, 1.0)
-    value, edges = ogdf.min_st_cut(c, weight, nodes[0], nodes[2], directed=False)
-    assert value == 2.0
-    assert len(list(edges)) == 2
+    cut = ogdf.min_st_cut(c, weight, nodes[0], nodes[2], directed=False)
+    assert cut.value == 2.0
+    assert len(cut.edges) == 2
 
 
 # --- matching --- #

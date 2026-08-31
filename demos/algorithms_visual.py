@@ -382,8 +382,9 @@ def demo_min_st_cut(out):
     cap[g.new_edge(mids[1], mids[4])] = rng.uniform(1.0, 5.0)
 
     flow_value = ogdf.max_flow(g, cap, s, t, ogdf.EdgeArrayDouble(g))
-    cut_value, cut_edges = ogdf.min_st_cut(g, cap, s, t)
-    cut = {e.index for e in cut_edges}
+    st_cut = ogdf.min_st_cut(g, cap, s, t)
+    cut_value = st_cut.value
+    cut = {e.index for e in st_cut.edges}
 
     ga = ogdf.GraphAttributes(g, ogdf.ALL_ATTRIBUTES)
     ogdf.SugiyamaLayout().call(ga)

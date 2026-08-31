@@ -140,6 +140,8 @@ nanobind_add_module(_core
     src/ogdf/bind_algorithms.cpp
     src/ogdf/bind_io.cpp
     src/ogdf/bind_generators.cpp
+    src/ogdf/bind_transforms.cpp
+    src/ogdf/bind_metrics.cpp
     src/ogdf/bind_meta.cpp)
 
 target_include_directories(_core PRIVATE ${OGDF_INCLUDE_DIRS})

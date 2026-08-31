@@ -47,11 +47,18 @@ ogdf.draw_svg(ga, "graph.svg")
 
 - **Reproducibility** - seeding for every stochastic operation, and `provenance()` metadata to record alongside a result.
 
+- **Drawing metrics** - crossings, edge-length uniformity, area, angular resolution, node overlap, and stress, plus a layout comparison helper.
+
+- **Coordinate transforms** - normalize, center, scale, fit-to-box, and component packing, all bend-aware.
+
+- **One-call workflow** - `layout(graph, ogdf.FMMMLayout, seed=..., pack=True, fit=(800, 600))` from graph to placed drawing.
+
 ## Where to go next
 
 - [Getting Started](getting-started.md) - installation, the graph model, interoperability, errors, and reproducibility.
 - [Choosing a Layout](choosing-a-layout.md) - which of the nineteen layouts fits your graph, and why.
 - [Recipes](recipes.md) - four complete workflows, from NetworkX to SVG to annotated drawings.
+- [Drawing Metrics](metrics.md) - measure and compare layouts on numbers rather than by eye.
 - [Gallery](gallery.md) - example drawings.
 - [Coverage](coverage.md) - exactly what is and is not included.
 

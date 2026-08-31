@@ -98,7 +98,7 @@ ogdf-py installation report
   compiler           : GCC 13.3.0
   extension          : .../ogdf/_core.cpython-313-x86_64-linux-gnu.so
 
-  capabilities       : 19 layouts, 82 algorithms/generators, 18 I/O functions, 22 types
+  capabilities       : 19 layouts, 99 algorithms/generators, 19 I/O functions, 27 types
 ```
 
 Include this output in bug reports. `ogdf.about()` returns the same data as a
@@ -309,12 +309,135 @@ tree_edges = ogdf.edges_where(in_tree, g)     # a list of Edge
 `nodes_where` is the node-side equivalent, used for cuts, matchings, and
 independent sets.
 
+## Result objects
+
+The array convention is efficient but lossy: `dijkstra` builds a shortest-path
+tree internally and throws it away, so you get distances but no paths. For the
+algorithms where that matters, a second entry point keeps the work and returns
+it with named fields. Both forms remain available - use the array form when
+calling in bulk.
+
+### Shortest paths
+
+```python
+paths = ogdf.shortest_paths(g, source, weight)   # weight optional (unit edges)
+
+paths.distance(v)            # math.inf if unreachable, not a magic sentinel
+paths.path_to(v)             # list of Edge, [] for the source, None if unreachable
+paths.nodes_to(v)            # list of Node including both endpoints
+paths.predecessor_edge(v)    # the edge used to reach v
+paths.reachable(v)           # also: `v in paths`
+paths.unreachable_nodes()
+paths.distances(keys=keys)   # dict, keyed by node.index or your own keys
+```
+
+`algorithm` defaults to `"auto"`: Dijkstra, unless `weight` is an
+`EdgeArrayInt` containing a negative length, in which case Bellman-Ford. Force
+either with `algorithm="dijkstra"` / `"bellman_ford"`. A reachable negative
+cycle raises `AlgorithmError` rather than returning meaningless distances.
+
+!!! note "Why Bellman-Ford takes integers"
+    `dijkstra` and `a_star_search` take `EdgeArrayDouble`; `bellman_ford` takes
+    `EdgeArrayInt`. That asymmetry is OGDF's: its shortest-path module interface
+    is defined over `int`, and it ships no floating-point Bellman-Ford. Since
+    the two algorithms are never interchangeable anyway - Dijkstra cannot accept
+    the negative weights that are Bellman-Ford's whole purpose - the binding
+    reports the constraint rather than papering over it with a reimplementation.
+    `shortest_paths` will accept an `EdgeArrayInt` for Dijkstra and convert it.
+
+### Cuts
+
+```python
+cut = ogdf.min_st_cut(g, weight, source, sink)   # directed=True by default
+
+cut.value          # equals the max flow, by duality
+cut.edges          # the edges crossing the cut
+value, edges = cut # STCut is a NamedTuple, so it still unpacks as a pair
+```
+
+A minimum cut need not be unique - the diamond `s->a, s->b, a->t, b->t, a->b`
+at unit capacity has two, `({s}, {a,b,t})` and `({s,a,b}, {t})`, both of value
+2 - and which one you get is OGDF's choice.
+
+!!! warning "There is no node partition, deliberately"
+    `MinSTCutMaxFlow` exposes a *front* and a *back* cut, which look like the
+    two sides of the cut but are not. They are the extreme cuts nearest the
+    source and nearest the sink; when the minimum cut is not unique these are
+    **different cuts**, and neither is guaranteed to match the edges you were
+    given. On the complete digraph on 20 nodes the front cut is `{s}` while the
+    returned edges are the sink's in-edges - so reporting the two together
+    would describe no single cut.
+
+    If you need the partition, derive it from the edges: the source side is
+    what stays reachable from `source` once they are removed. That is
+    guaranteed to be consistent with the cut you actually got.
+
+`max_flow` keeps its array form and reports the flow value only - OGDF's
+max-flow module computes no cut. Use `min_st_cut` for the partition induced by
+the flow; by max-flow min-cut duality the values agree.
+
+### What every result promises
+
+- **Ordering.** Lists come back in the graph's node or edge iteration order,
+  which is insertion order until something is deleted.
+- **Unreachable.** `shortest_paths` reports `math.inf` and `None`. The raw array
+  functions leave OGDF's sentinel in place, documented per function.
+- **Parallel edges.** Honoured individually - the cheapest of a parallel bundle
+  wins, and each carries flow separately.
+- **Directedness.** Stated per function. `dijkstra` and the unweighted BFS treat
+  edges as undirected unless told otherwise; `bellman_ford` always honours
+  direction; the matching and spanning-tree routines ignore it.
+- **Provenance.** Every algorithm docstring says whether it is exact, heuristic,
+  or approximate - `node_coloring` is a heuristic upper bound, `steiner_tree` is
+  a 2-approximation, `maximal_matching` is maximal but not maximum.
+
 ### Node identity
 
 Conversions are keyed by whatever hashable object you use on the Python side,
 and default to `node.index` when you do not supply a mapping. An index is stable
 for as long as the node exists, but OGDF reuses indices after deletion, so a
 mapping captured before a mutation must not be reused afterwards.
+
+## One call: `layout()`
+
+Everything above is a separate step because sometimes you need to interleave
+them. When you do not, `layout()` is the whole sequence at once:
+
+```python
+ga = ogdf.layout(g, ogdf.FMMMLayout, unit_edge_length=25.0,
+                 seed=42, pack=True, fit=(800, 600), margin=20)
+ogdf.draw_svg(ga, "graph.svg")
+```
+
+The algorithm is normally a **class**, so your editor completes it and mypy
+checks it. Keyword options are forwarded to that layout's setters -
+`unit_edge_length=25.0` calls `set_unit_edge_length(25.0)` - and an unknown one
+tells you what the layout does accept:
+
+```pycon
+>>> ogdf.layout(g, ogdf.FMMMLayout, bogus=1)
+TypeError: FMMMLayout has no option 'bogus'. It accepts: fixed_iterations,
+new_initial_placement, quality_versus_speed, rand_seed, unit_edge_length,
+use_high_level_options
+```
+
+A string works too, for when the choice comes from a config file or a command
+line rather than from code. `ogdf.layout_names()` lists what is accepted -
+every class name plus short aliases like `"fmmm"`, `"stress"`, `"planar"`:
+
+```python
+ga = ogdf.layout(g, "sugiyama", runs=8, transpose=True)
+```
+
+The optional steps are all off by default: `seed` for reproducibility,
+`validate` (on) to check preconditions before doing any work, `pack` to spread
+disconnected components, `fit`/`margin` to place the drawing in a box,
+`normalize` to move the corner to the origin, and `attributes` to lay out into
+a `GraphAttributes` you have already styled.
+
+It returns the `GraphAttributes`, ready to draw. Metrics and provenance are
+deliberately not computed for you - `ogdf.drawing_metrics(ga)` is quadratic and
+most callers do not want it - but each is one further call.
 
 ## Errors and preconditions
 

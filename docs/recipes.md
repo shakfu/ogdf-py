@@ -94,7 +94,7 @@ ogdf.topological_numbering(g, order)
 keys = {v: k for k, v in mapping.items()}
 build_order = sorted(g.nodes(), key=lambda v: order[v], reverse=True)
 print([keys[v] for v in build_order])
-# ['crypto', 'sockets', 'tls', 'db', 'http', 'app']
+# ['crypto', 'tls', 'sockets', 'http', 'db', 'app']
 ```
 
 ## 3. Planar graph to TikZ

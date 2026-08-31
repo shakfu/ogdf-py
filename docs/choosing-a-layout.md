@@ -71,23 +71,34 @@ upward layouts are deterministic given a fixed graph and embedding.
 
 ## Comparing candidates
 
-When two layouts are plausible, measure instead of guessing. The heuristic
-layouts report their achieved objective:
+When two layouts are plausible, measure instead of guessing:
 
 ```python
 import ogdf
 
 g = ogdf.Graph()
-ogdf.random_graph(g, 60, 120)
+with ogdf.seeded(1):
+    ogdf.random_graph(g, 60, 120)
 
-for name in ("SugiyamaLayout", "PlanarizationLayout"):
-    with ogdf.seeded(1):
-        ga = ogdf.GraphAttributes(g)
-        layout = getattr(ogdf, name)()
-        layout.call(ga)
-        print(name, layout.number_of_crossings(),
-              ga.bounding_box_width(), ga.bounding_box_height())
+for row in ogdf.compare_layouts(g, {
+    "sugiyama": ogdf.SugiyamaLayout,
+    "fmmm": ogdf.FMMMLayout,
+    "stress": ogdf.StressMinimization,
+    "planar": ogdf.SchnyderLayout,      # will be rejected: not planar
+}, seed=1):
+    if "error" in row:
+        print(f"{row['layout']:10} n/a - {row['error']}")
+    else:
+        print(f"{row['layout']:10} crossings={row['crossings']:4} "
+              f"stress={row['stress']:.3f} area={row['area']:.0f}")
 ```
 
-`ogdf.crossing_number(g, permutations=8)` gives a heuristic lower reference
-point to compare those crossing counts against.
+Results come back best-first, ranked by crossings then stress. A layout whose
+preconditions this graph fails is reported with an `error` key rather than
+raising, so you can throw every candidate at a graph and see what sticks. Pass
+`seed` so the randomized layouts are compared like for like.
+
+`ogdf.crossing_number(g, permutations=8)` gives a heuristic reference point to
+compare those crossing counts against - no drawing can do better.
+
+See [Drawing quality metrics](metrics.md) for what each number means.

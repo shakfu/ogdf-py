@@ -17,5 +17,7 @@ NB_MODULE(_core, m) {
     register_algorithms(m);
     register_io(m);
     register_generators(m);
+    register_transforms(m);
+    register_metrics(m);
     register_meta(m);
 }

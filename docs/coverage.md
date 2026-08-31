@@ -38,9 +38,19 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 9. **Reproducibility** - seeding for every stochastic operation, `provenance()` metadata, and achieved objective values from the heuristic layouts.
 
-**Next (priority):**
+**Done (Tier 4 - results, placement, and measurement):**
 
-10. **Result ergonomics** - the array-output convention leaves useful information unreported. `dijkstra` and `bellman_ford` already compute a predecessor array internally and discard it, so shortest *paths* (not just distances) are nearly free; `max_flow` should return the source-side partition and `min_st_cut` both sides; and `bellman_ford`'s integer edge lengths should be reconciled with the `double` weights used by `dijkstra` and `a_star_search`.
+10. **Result objects** - `shortest_paths()` returns distances *and* the shortest-path tree that the array form discards, so paths, predecessors, and reachability are available without rebuilding them; `min_st_cut()` returns an `STCut` with named fields. The array-output functions are unchanged and remain the bulk-calling path. Every algorithm docstring now states its provenance (exact / heuristic / approximate), its directedness, its parallel-edge behaviour, and its unreachable sentinel.
+
+    The node partition for `min_st_cut` was investigated and **deliberately not exposed**. OGDF's front and back cuts are the extreme minimum cuts nearest the source and nearest the sink; when the minimum cut is not unique they are different cuts, and neither reliably corresponds to the edge list returned alongside them. Callers who need the partition should derive it from the cut edges.
+
+    The `int` / `double` split between `bellman_ford` and `dijkstra` is **kept and documented** rather than removed: OGDF's `ShortestPathModule` interface is defined over `int` and it ships no floating-point Bellman-Ford, so closing the gap would mean reimplementing the algorithm rather than binding one. The two are not interchangeable anyway - Dijkstra rejects the negative weights Bellman-Ford exists for. `shortest_paths()` accepts either array type and picks the engine.
+
+11. **Drawing quality metrics** - `count_crossings`, `edge_lengths`, `bounding_box`, `node_overlaps`, `min_angle`, and `stress`, aggregated by `drawing_metrics()` and ranked by `compare_layouts()`. Computed over the drawn polylines, so edge bends count.
+
+12. **Coordinate transforms** - `normalize`, `center`, `translate`, `scale`, `fit_to_box`, and `pack_components` (binding OGDF's `TileToRowsCCPacker`). All move edge bends as well as node coordinates, so routed drawings survive.
+
+13. **High-level `layout()` facade** - one call from graph to placed drawing, composing preconditions, seeding, the layout, component packing, and fit-to-box. The algorithm is a class by default so it stays type-checked and completable; a string is accepted for config-driven use, and options are forwarded to the layout's setters by a mechanical `set_X` mapping that cannot drift from the bindings.
 
 **Not scheduled:**
 
@@ -52,13 +62,17 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 - [x] `Graph`, `Node`, `Edge`, node/edge iteration
 
-- [x] `NodeArray` / `EdgeArray` (int, double, bool)
+- [x] `NodeArray` / `EdgeArray` in three element types: `NodeArrayInt`, `NodeArrayDouble`, `NodeArrayBool`, `EdgeArrayInt`, `EdgeArrayDouble`, `EdgeArrayBool`
 
 - [x] `GraphAttributes`: coordinates, width/height, labels
 
 - [x] `GraphAttributes.graph`, `.has(flags)` (is an attribute group enabled), `.directed`
 
 - [x] Styling: `Color`, `Shape`, `StrokeType`, `FillPattern`, `EdgeArrow`
+
+- [x] Attribute flags to enable groups of attributes: `NODE_GRAPHICS`, `EDGE_GRAPHICS`, `NODE_LABEL`, `EDGE_LABEL`, `NODE_STYLE`, `EDGE_STYLE`, `EDGE_ARROW`, `ALL_ATTRIBUTES`
+
+- [x] Layout configuration enums: `Orientation`, `RootSelection`, `RadialRootSelection`, `QualityVsSpeed`
 
 - [x] Node fill/stroke color, shape, fill pattern, stroke width
 
@@ -168,11 +182,13 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 ### Shortest paths
 
-- [x] `dijkstra` (single-source, weighted)
+- [x] `dijkstra` (single-source, weighted; array form) and `dijkstra_tree` (also returns the shortest-path tree)
 
 - [x] A* search (`a_star_search`, point-to-point; optional admissible heuristic)
 
-- [x] Bellman-Ford (`bellman_ford`, negative weights)
+- [x] Bellman-Ford (`bellman_ford`, negative weights, integer lengths - see item 10) and `bellman_ford_tree`
+
+- [x] `shortest_paths()` - result object with distances, paths, predecessors, and reachability; picks Dijkstra or Bellman-Ford automatically
 
 - [x] Unweighted BFS distances (`bfs_distances`, single-source)
 
@@ -188,7 +204,7 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 - [x] Min-cost flow (`min_cost_flow`, Reinelt)
 
-- [x] s-t min cut, directed or undirected (`min_st_cut`, returns value and cut edges; companion to global `min_cut` + `max_flow`)
+- [x] s-t min cut, directed or undirected (`min_st_cut` returns an `STCut(value, edges)`; `st_cut` is the low-level form). Companion to global `min_cut` + `max_flow`. The node partition is not reported - see item 10
 
 - [ ] Nagamochi-Ibaraki min cut
 
@@ -331,19 +347,47 @@ Python. Covered in depth in [Getting Started](getting-started.md).
 
 - [ ] A serializable "layout recipe" (graph hash + algorithm + options + seed + versions + output metrics)
 
+### Results
+
+- [x] Result objects with named fields, alongside the array-output form, which stays the bulk-calling path: `ShortestPaths` (distances, paths, predecessors, reachability) and `STCut` (value and cut edges)
+
+- [x] `shortest_paths()` picks Dijkstra or Bellman-Ford automatically and reports unreachability as `math.inf` / `None` rather than OGDF's raw sentinel
+
+- [ ] Result objects for the remaining array-output algorithms (matching, colouring, components)
+
+### Placing a drawing
+
+- [x] Coordinate transforms: `normalize`, `center`, `translate`, `scale`, `fit_to_box`, `pack_components` (the last binding OGDF's `TileToRowsCCPacker`). All move edge bends as well as node coordinates
+
+- [x] Low-level forms, if you need them: `translate_drawing`, `scale_drawing`, `fit_scale`, `tile_components`
+
+- [ ] Rotation and reflection
+
+- [ ] Per-component transforms (fit each component to its own box)
+
+### Measuring a drawing
+
+- [x] `count_crossings`, `edge_lengths`, `bounding_box`, `node_overlaps`, `min_angle` (angular resolution), `stress` - all computed over the drawn polylines, so bends count
+
+- [x] `drawing_metrics()` aggregates them into one serializable dict; `compare_layouts()` runs several layouts and ranks them
+
+- [ ] Edge-edge and node-edge distance, symmetry, and orthogonality metrics
+
+- [ ] A benchmark runner recording runtime and memory alongside the metrics
+
+### Workflow
+
+- [x] `layout(graph, algorithm=FMMMLayout, **options)` - preconditions, seeding, the layout, packing, and fit-to-box in one call. The algorithm is a class by default so it stays type-checked; a string is accepted for config-driven use, and `layout_names()` lists what resolves
+
+- [ ] A serializable "layout recipe" that replays a drawing from graph + algorithm + options + seed
+
 ### Not yet provided
-
-- [ ] Result objects with named fields (see item 10 of the [Priority roadmap](#priority-roadmap))
-
-- [ ] A high-level `layout(graph, algorithm=...)` facade
-
-- [ ] Coordinate normalization, fit-to-box, and component packing helpers
-
-- [ ] Drawing-quality metrics (edge-length distribution, angular resolution, area, overlap, stress)
 
 - [ ] Themes, palettes, and style-by-attribute helpers
 
 - [ ] Notebook / interactive HTML output beyond the SVG string
+
+- [ ] A CLI for converting, laying out, and rendering graph files
 
 ## Excluded subsystems
 
