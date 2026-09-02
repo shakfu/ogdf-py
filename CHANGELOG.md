@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The two `0.5.0` strings in `docs/getting-started.md` are now `0.5.1`, and `make release` rewrites them along with `pyproject.toml`. `test_provenance_example_keys_match` compares the documented `package_version` against the installed one, so a version bump that touches only `pyproject.toml` fails every wheel job at the cibuildwheel test step - after the wheels have already been built.
+
 ## [0.5.1]
 
 ### Fixed

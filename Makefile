@@ -117,7 +117,7 @@ docs-deploy: demos
 # Create a release (bump version, tag, push)
 release:
 	@echo "Current version: $$(grep '^version' pyproject.toml | head -1)"
-	@read -p "New version: " version; 	sed "s/^version = .*/version = \"$$version\"/" pyproject.toml > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml; 	git add pyproject.toml; 	git commit -m "Bump version to $$version"; 	git tag -a "v$$version" -m "Release $$version"; 	echo "Tagged v$$version. Run 'git push && git push --tags' to publish."
+	@read -p "New version: " version; 	sed "s/^version = .*/version = \"$$version\"/" pyproject.toml > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml; 	sed -E "s/(package version *: ).*/\1$$version/; s/('package_version': ')[^']*'/\1$$version'/" docs/getting-started.md > docs/getting-started.md.tmp && mv docs/getting-started.md.tmp docs/getting-started.md; 	git add pyproject.toml docs/getting-started.md; 	git commit -m "Bump version to $$version"; 	git tag -a "v$$version" -m "Release $$version"; 	echo "Tagged v$$version. Run 'git push && git push --tags' to publish."
 
 # Clean build artifacts
 clean:
