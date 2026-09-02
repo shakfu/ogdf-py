@@ -199,9 +199,11 @@ earlier seed rather than resuming exactly where the block began.
 
 Given the same seed, the same package version, and the same OGDF build, a
 sequence of calls produces the same graph and the same coordinates. Results are
-**not** guaranteed bit-for-bit across platforms, compilers, or OGDF versions -
-layout code is floating-point heavy and sensitive to instruction selection and
-library math.
+**not** guaranteed across platforms, compilers, or OGDF versions. Layout code is
+floating-point heavy and sensitive to instruction selection and library math,
+and the generators draw through `std::uniform_int_distribution`, whose algorithm
+the C++ standard leaves to the implementation - so a different standard library
+gives you a different graph, not just different coordinates.
 
 Record `ogdf.provenance()` next to a result so a later run can be compared
 against like conditions:

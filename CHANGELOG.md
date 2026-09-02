@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The `drawing_metrics` example in `docs/metrics.md` now shows values measured from the snippet as written, and says they are machine-specific. The generators draw through `std::uniform_int_distribution`, whose algorithm the C++ standard leaves to the implementation, so the same seed builds a different graph under libc++ than under libstdc++ - the drawing is not the only thing that moves between platforms. `test_drawing_metrics_example_matches_reality` accordingly checks the key set, the graph size, and the arithmetic between the documented numbers rather than asserting values no other platform can reproduce.
+
+- Tests now seed OGDF's engine before each one (`tests/conftest.py`). The engine is process-wide, so a test that generated a random graph without seeding got whatever position the engine was left in by the tests before it - passing under `pytest tests/` and drawing a different graph under `pytest tests/test_x.py` or `--lf`.
+
 ## [0.5.0]
 
 ### Added

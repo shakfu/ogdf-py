@@ -22,16 +22,20 @@ ogdf.drawing_metrics(ga)
 
 ```python
 {'nodes': 40, 'edges': 80,
- 'crossings': 104,
- 'edge_length_min': 0.0, 'edge_length_max': 67.268,
- 'edge_length_mean': 47.128, 'edge_length_stdev': 12.142, 'edge_length_cv': 0.258,
- 'width': 224.0, 'height': 223.0, 'area': 49952.0, 'aspect_ratio': 1.004,
- 'node_overlap_pairs': 11, 'node_overlap_area': 820.0,
+ 'crossings': 123,
+ 'edge_length_min': 23.537, 'edge_length_max': 66.068,
+ 'edge_length_mean': 48.370, 'edge_length_stdev': 8.291, 'edge_length_cv': 0.171,
+ 'width': 285.0, 'height': 244.0, 'area': 69540.0, 'aspect_ratio': 1.168,
+ 'node_overlap_pairs': 16, 'node_overlap_area': 1224.0,
  'min_angle': 0.0, 'min_angle_degrees': 0.0,
- 'stress': 82.502}
+ 'stress': 73.992}
 ```
 
-That `edge_length_min` of 0 and `min_angle` of 0 are not bugs - see
+These numbers come from one machine. The same seed builds a different graph
+under a different standard library, so every value here moves with the platform
+- see [What is guaranteed](getting-started.md#what-is-guaranteed).
+
+That `min_angle` of 0 is not a bug - see
 [Reading the degenerate cases](#reading-the-degenerate-cases) below.
 
 A plain dict of plain numbers, so it serializes directly and sits happily next
