@@ -96,7 +96,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: thirdparty/ogdf
-          key: ogdf-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py') }}
+          key: ogdf-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py', 'scripts/ogdf-tag.txt') }}
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v4.1.0

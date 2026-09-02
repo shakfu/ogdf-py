@@ -1,6 +1,6 @@
 [project]
 name = "ogdf-py"
-version = "0.4.0"
+version = "0.5.0"
 description = "Python bindings for the Open Graph Drawing Framework (OGDF), built with nanobind."
 readme = "README.md"
 license = { text = "MIT" }
