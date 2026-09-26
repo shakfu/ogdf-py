@@ -55,13 +55,6 @@ jobs:
       - name: Run tests
         run: uv run pytest tests/ -v --cov=src/ogdf --cov-report=xml
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v7
-        with:
-          files: coverage.xml
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   offline-build:
     name: Offline source build
     runs-on: ubuntu-latest
