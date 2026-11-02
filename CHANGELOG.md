@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - `min_spanning_tree` uses Kruskal and returns a minimum spanning forest. OGDF's Prim started from the first node, so on a disconnected graph it covered one component; the docstring already promised a forest.
 
-- `set_seed` accepts `[-2**31, 2**32)`, which covers every value `new_seed()` returns. It accepted int32 only, so about half of drawn seeds raised `TypeError`. Values outside the range raise `PreconditionError` (a `ValueError`).
+- `set_seed` accepts `[-2**31, 2**32)`, and `new_seed()` returns values in `[0, 2**32)` on every platform. `set_seed` accepted int32 only, so about half of drawn seeds raised `TypeError`. OGDF's `randomSeed()` computes in `uint_fast32_t`, which is 64 bits under libstdc++, so on Linux `new_seed()` also returned values up to about `7 * 2**32`. Values outside the range raise `PreconditionError` (a `ValueError`).
 
 ### Fixed
 

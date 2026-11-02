@@ -89,8 +89,12 @@ void register_meta(nb::module_& m) {
           "layout, and heuristic draws from it, so this makes them "
           "reproducible. Prefer `ogdf.set_seed()` / `ogdf.seeded()`, which "
           "wrap this and record the seed for `ogdf.provenance()`.");
+    // randomSeed() computes 7 * engine() + 3 in uint_fast32_t, which is 32 bits
+    // under libc++ but 64 under libstdc++, so on Linux it exceeds 2**32 and
+    // seed_random_engine rejects it. Reduce modulo 2**32 on every platform.
     m.def("draw_random_seed", []() {
-              return static_cast<long long>(ogdf::randomSeed());
+              return static_cast<long long>(
+                  static_cast<std::uint32_t>(ogdf::randomSeed()));
           },
           "Draw a fresh seed value from OGDF's engine. Useful to pick a seed, "
           "record it, and then set it - the engine has no way to report the "
