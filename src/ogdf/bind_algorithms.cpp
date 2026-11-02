@@ -10,8 +10,13 @@
 
 #include <nanobind/stl/string.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <functional>
+#include <limits>
+#include <numeric>
 #include <stdexcept>
+#include <vector>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -37,12 +42,126 @@
 #include <ogdf/planarity/PlanRepLight.h>
 #include <ogdf/planarity/SubgraphPlanarizer.h>
 #include <ogdf/planarity/VariableEmbeddingInserter.h>
-#include <ogdf/graphalg/ShortestPathWithBFM.h>
 #include <ogdf/graphalg/steiner_tree/EdgeWeightedGraph.h>
 #include <ogdf/graphalg/steiner_tree/EdgeWeightedGraphCopy.h>
 
 using namespace ogdf;
 using namespace nb::literals;
+
+namespace {
+
+// Convert one item of a Python list to a handle of `g`. nb::cast would map
+// None to nullptr and raise std::bad_cast for other types.
+template <typename Handle>
+Handle handle_of(nb::handle item, const Graph& g, const char* op,
+                 const char* arg, const char* kind) {
+    Handle h = nullptr;
+    if (item.is_none() || !nb::try_cast<Handle>(item, h)) {
+        throw nb::type_error((std::string(op) + ": every item of '" + arg +
+                              "' must be an ogdf." + kind)
+                                 .c_str());
+    }
+    ogdfpy::require_element_of(g, h, op, arg, kind == std::string("Node")
+                                                  ? "node"
+                                                  : "edge");
+    return h;
+}
+
+// Kruskal over all edges: a minimum spanning forest, one tree per component.
+// OGDF's computeMinST runs Prim from the first node and so covers only that
+// node's component.
+double min_spanning_forest(const Graph& g, const EdgeArray<double>& weight,
+                           EdgeArray<bool>& in_tree) {
+    std::vector<edge> order;
+    order.reserve(g.numberOfEdges());
+    for (edge e : g.edges) {
+        in_tree[e] = false;
+        if (!e->isSelfLoop()) {
+            order.push_back(e);
+        }
+    }
+    std::stable_sort(order.begin(), order.end(), [&weight](edge a, edge b) {
+        return weight[a] < weight[b];
+    });
+    NodeArray<node> parent(g);
+    for (node v : g.nodes) {
+        parent[v] = v;
+    }
+    auto find = [&parent](node v) {
+        while (parent[v] != v) {
+            parent[v] = parent[parent[v]];
+            v = parent[v];
+        }
+        return v;
+    };
+    double total = 0.0;
+    for (edge e : order) {
+        node a = find(e->source());
+        node b = find(e->target());
+        if (a != b) {
+            parent[a] = b;
+            in_tree[e] = true;
+            total += weight[e];
+        }
+    }
+    return total;
+}
+
+// Bellman-Ford with 64-bit accumulation that never relaxes out of an
+// unreachable node. OGDF's ShortestPathWithBFM adds lengths to its INT_MAX
+// sentinel, which overflows and corrupts every distance downstream of an
+// unreachable node. Returns false if a negative cycle is reachable from s.
+bool bellman_ford_checked(const Graph& g, node s, const EdgeArray<int>& length,
+                          NodeArray<int>& distance,
+                          NodeArray<edge>& predecessor, const char* op) {
+    // |distance| <= sum |length|, so this bound keeps every distance in int
+    // range and leaves INT_MAX free as the unreachable sentinel.
+    std::int64_t bound = 0;
+    for (edge e : g.edges) {
+        bound += std::abs(static_cast<std::int64_t>(length[e]));
+    }
+    ogdfpy::require_arg(bound < std::numeric_limits<int>::max(), op,
+                        "the sum of |length| must be below 2**31 - 1");
+    constexpr std::int64_t kInf = std::numeric_limits<std::int64_t>::max();
+    NodeArray<std::int64_t> d(g, kInf);
+    for (node v : g.nodes) {
+        predecessor[v] = nullptr;
+    }
+    d[s] = 0;
+    auto relax = [&](bool update) {
+        bool changed = false;
+        for (edge e : g.edges) {
+            node u = e->source();
+            if (d[u] == kInf) {
+                continue;
+            }
+            std::int64_t cand = d[u] + length[e];
+            node v = e->target();
+            if (cand < d[v]) {
+                changed = true;
+                if (!update) {
+                    return true;
+                }
+                d[v] = cand;
+                predecessor[v] = e;
+            }
+        }
+        return changed;
+    };
+    for (int i = 1; i < g.numberOfNodes(); ++i) {
+        if (!relax(true)) {
+            break;
+        }
+    }
+    const bool ok = !relax(false);
+    for (node v : g.nodes) {
+        distance[v] = d[v] == kInf ? std::numeric_limits<int>::max()
+                                   : static_cast<int>(d[v]);
+    }
+    return ok;
+}
+
+}  // namespace
 
 void register_algorithms(nb::module_& m) {
     // ---------------------------------------------------------------- //
@@ -61,6 +180,8 @@ void register_algorithms(nb::module_& m) {
           "graph"_a);
     m.def("is_bipartite",
           [](const Graph& g, NodeArray<bool>& coloring) {
+              ogdfpy::require_same_graph(coloring, g, "is_bipartite",
+                                         "coloring");
               return isBipartite(g, coloring);
           },
           "graph"_a, "coloring"_a,
@@ -116,6 +237,8 @@ void register_algorithms(nb::module_& m) {
     };
     auto local_connectivity = [](const Graph& g, node s, node t, bool node_conn,
                                  bool directed) {
+        ogdfpy::require_node_of(g, s, "connectivity", "source");
+        ogdfpy::require_node_of(g, t, "connectivity", "target");
         ogdfpy::require_distinct(s, t, "connectivity");
         ConnectivityTester ct(node_conn, directed);
         return ct.computeConnectivity(g, s, t);
@@ -156,6 +279,8 @@ void register_algorithms(nb::module_& m) {
     // ---------------------------------------------------------------- //
     m.def("connected_components",
           [](const Graph& g, NodeArray<int>& component) {
+              ogdfpy::require_same_graph(component, g, "connected_components",
+                                         "component");
               return connectedComponents(g, component);
           },
           "graph"_a, "component"_a,
@@ -163,6 +288,8 @@ void register_algorithms(nb::module_& m) {
           "`component`.");
     m.def("strong_components",
           [](const Graph& g, NodeArray<int>& component) {
+              ogdfpy::require_same_graph(component, g, "strong_components",
+                                         "component");
               return strongComponents(g, component);
           },
           "graph"_a, "component"_a,
@@ -170,6 +297,8 @@ void register_algorithms(nb::module_& m) {
           "`component`).");
     m.def("biconnected_components",
           [](const Graph& g, EdgeArray<int>& component) {
+              ogdfpy::require_same_graph(component, g, "biconnected_components",
+                                         "component");
               return biconnectedComponents(g, component);
           },
           "graph"_a, "component"_a,
@@ -211,8 +340,16 @@ void register_algorithms(nb::module_& m) {
     m.def("planar_embed", &planarEmbed, "graph"_a,
           "Compute a planar embedding (reorders adjacency lists). Returns "
           "False if the graph is not planar.");
-    m.def("planar_embed_planar_graph", &planarEmbedPlanarGraph, "graph"_a,
-          "Faster planar embedding for a graph already known to be planar.");
+    // On non-planar input OGDF modifies the graph (K5 gains two nodes) and
+    // marks the result as embedded.
+    m.def("planar_embed_planar_graph",
+          [](Graph& g) {
+              ogdfpy::require_planar(g, "planar_embed_planar_graph");
+              return planarEmbedPlanarGraph(g);
+          },
+          "graph"_a,
+          "Faster planar embedding for a planar graph. Raises "
+          "InvalidGraphError if the graph is not planar.");
     m.def("represents_comb_embedding",
           [](const Graph& g) { return g.representsCombEmbedding(); },
           "graph"_a,
@@ -225,7 +362,7 @@ void register_algorithms(nb::module_& m) {
     m.def("dijkstra",
           [](const Graph& g, const EdgeArray<double>& weight, node source,
              NodeArray<double>& distance, bool directed) {
-              ogdfpy::require_node(source, "dijkstra", "source");
+              ogdfpy::require_node_of(g, source, "dijkstra", "source");
               ogdfpy::require_same_graph(weight, g, "dijkstra", "weight");
               ogdfpy::require_same_graph(distance, g, "dijkstra", "distance");
               ogdfpy::require_non_negative(weight, g, "dijkstra", "weight");
@@ -248,7 +385,7 @@ void register_algorithms(nb::module_& m) {
     m.def("dijkstra_tree",
           [](const Graph& g, const EdgeArray<double>& weight, node source,
              bool directed) {
-              ogdfpy::require_node(source, "dijkstra_tree", "source");
+              ogdfpy::require_node_of(g, source, "dijkstra_tree", "source");
               ogdfpy::require_same_graph(weight, g, "dijkstra_tree", "weight");
               ogdfpy::require_non_negative(weight, g, "dijkstra_tree", "weight");
               NodeArray<edge> predecessor(g);
@@ -264,7 +401,7 @@ void register_algorithms(nb::module_& m) {
                   predecessors.append(
                       predecessor[v] == nullptr
                           ? nb::none()
-                          : nb::cast(predecessor[v], nb::rv_policy::reference));
+                          : ogdfpy::to_python(predecessor[v], g));
               }
               return nb::make_tuple(distances, predecessors);
           },
@@ -275,7 +412,7 @@ void register_algorithms(nb::module_& m) {
           "this in a result object.");
     m.def("bfs_distances",
           [](const Graph& g, node source, NodeArray<int>& distance) {
-              ogdfpy::require_node(source, "bfs_distances", "source");
+              ogdfpy::require_node_of(g, source, "bfs_distances", "source");
               ogdfpy::require_same_graph(distance, g, "bfs_distances",
                                          "distance");
               bfs_SPSS<int>(source, g, distance, 1);
@@ -297,10 +434,11 @@ void register_algorithms(nb::module_& m) {
                                          "weight");
               ogdfpy::require_same_graph(in_tree, g, "min_spanning_tree",
                                          "in_tree");
-              return computeMinST(g, weight, in_tree);
+              ogdfpy::require_no_nan(weight, g, "min_spanning_tree", "weight");
+              return min_spanning_forest(g, weight, in_tree);
           },
           "graph"_a, "weight"_a, "in_tree"_a,
-          "Minimum spanning tree (Prim; exact). Returns total weight; marks "
+          "Minimum spanning tree (Kruskal; exact). Returns total weight; marks "
           "tree edges in `in_tree`, which `edges_where()` turns into a list. "
           "Edge direction is ignored. On a disconnected graph this yields a "
           "minimum spanning *forest*. Does not modify the graph.");
@@ -308,6 +446,8 @@ void register_algorithms(nb::module_& m) {
           [](Graph& g, const EdgeArray<double>& weight) {
               ogdfpy::require_same_graph(weight, g,
                                          "make_minimum_spanning_tree", "weight");
+              ogdfpy::require_no_nan(weight, g, "make_minimum_spanning_tree",
+                                     "weight");
               return makeMinimumSpanningTree(g, weight);
           },
           "graph"_a, "weight"_a,
@@ -320,8 +460,8 @@ void register_algorithms(nb::module_& m) {
     m.def("max_flow",
           [](const Graph& g, const EdgeArray<double>& capacity, node s,
              node t, EdgeArray<double>& flow) {
-              ogdfpy::require_node(s, "max_flow", "source");
-              ogdfpy::require_node(t, "max_flow", "sink");
+              ogdfpy::require_node_of(g, s, "max_flow", "source");
+              ogdfpy::require_node_of(g, t, "max_flow", "sink");
               ogdfpy::require_distinct(s, t, "max_flow");
               ogdfpy::require_same_graph(capacity, g, "max_flow", "capacity");
               ogdfpy::require_same_graph(flow, g, "max_flow", "flow");
@@ -352,8 +492,8 @@ void register_algorithms(nb::module_& m) {
     m.def("st_cut",
           [](const Graph& g, const EdgeArray<double>& weight, node s, node t,
              bool directed) {
-              ogdfpy::require_node(s, "st_cut", "source");
-              ogdfpy::require_node(t, "st_cut", "sink");
+              ogdfpy::require_node_of(g, s, "st_cut", "source");
+              ogdfpy::require_node_of(g, t, "st_cut", "sink");
               ogdfpy::require_distinct(s, t, "st_cut");
               ogdfpy::require_same_graph(weight, g, "st_cut", "weight");
               ogdfpy::require_non_negative(weight, g, "st_cut", "weight");
@@ -376,7 +516,7 @@ void register_algorithms(nb::module_& m) {
               nb::list edges;
               for (edge e : cut) {
                   value += weight[e];
-                  edges.append(nb::cast(e, nb::rv_policy::reference));
+                  edges.append(ogdfpy::to_python(e, g));
               }
               return nb::make_tuple(value, edges);
           },
@@ -395,7 +535,7 @@ void register_algorithms(nb::module_& m) {
               Matching::findMaximalMatching(g, matching);
               nb::list out;
               for (edge e : matching) {
-                  out.append(nb::cast(e, nb::rv_policy::reference));
+                  out.append(ogdfpy::to_python(e, g));
               }
               return out;
           },
@@ -462,7 +602,7 @@ void register_algorithms(nb::module_& m) {
               findCutVertices(g, cut);
               nb::list out;
               for (node v : cut) {
-                  out.append(nb::cast(v, nb::rv_policy::reference));
+                  out.append(ogdfpy::to_python(v, g));
               }
               return out;
           },
@@ -482,7 +622,7 @@ void register_algorithms(nb::module_& m) {
               nb::list out;
               for (edge e : g.edges) {
                   if (!e->isSelfLoop() && count[component[e]] == 1) {
-                      out.append(nb::cast(e, nb::rv_policy::reference));
+                      out.append(ogdfpy::to_python(e, g));
                   }
               }
               return out;
@@ -495,14 +635,20 @@ void register_algorithms(nb::module_& m) {
     m.def("bellman_ford",
           [](const Graph& g, node source, const EdgeArray<int>& length,
              NodeArray<int>& distance) {
+              ogdfpy::require_node_of(g, source, "bellman_ford", "source");
+              ogdfpy::require_same_graph(length, g, "bellman_ford", "length");
+              ogdfpy::require_same_graph(distance, g, "bellman_ford",
+                                         "distance");
               NodeArray<edge> predecessor(g);
-              return ShortestPathWithBFM().call(g, source, length, distance,
-                                                predecessor);
+              return bellman_ford_checked(g, source, length, distance,
+                                          predecessor, "bellman_ford");
           },
           "graph"_a, "source"_a, "length"_a, "distance"_a,
           "Bellman-Ford single-source shortest paths (exact) on a directed "
           "graph with integer (possibly negative) edge lengths. Returns False "
-          "if a negative cycle exists; writes distances into `distance`. Edge "
+          "if a negative cycle is reachable from the source; writes distances "
+          "into `distance`, with 2**31 - 1 for unreachable nodes. The sum of "
+          "|length| must be below 2**31 - 1. Edge "
           "direction is always honoured - unlike `dijkstra`, there is no "
           "undirected mode. Lengths are integers because OGDF's shortest-path "
           "module interface is defined over int; `dijkstra` and "
@@ -512,13 +658,14 @@ void register_algorithms(nb::module_& m) {
     // Low-level primitive behind `shortest_paths(algorithm="bellman_ford")`.
     m.def("bellman_ford_tree",
           [](const Graph& g, node source, const EdgeArray<int>& length) {
-              ogdfpy::require_node(source, "bellman_ford_tree", "source");
+              ogdfpy::require_node_of(g, source, "bellman_ford_tree", "source");
               ogdfpy::require_same_graph(length, g, "bellman_ford_tree",
                                          "length");
               NodeArray<edge> predecessor(g);
               NodeArray<int> distance(g);
-              const bool ok = ShortestPathWithBFM().call(g, source, length,
-                                                         distance, predecessor);
+              const bool ok =
+                  bellman_ford_checked(g, source, length, distance,
+                                       predecessor, "bellman_ford_tree");
               nb::list distances;
               nb::list predecessors;
               for (node v : g.nodes) {
@@ -526,7 +673,7 @@ void register_algorithms(nb::module_& m) {
                   predecessors.append(
                       predecessor[v] == nullptr
                           ? nb::none()
-                          : nb::cast(predecessor[v], nb::rv_policy::reference));
+                          : ogdfpy::to_python(predecessor[v], g));
               }
               return nb::make_tuple(ok, distances, predecessors);
           },
@@ -543,17 +690,17 @@ void register_algorithms(nb::module_& m) {
           [](const Graph& g, const EdgeArray<double>& cost, node source,
              node target, bool directed,
              nb::object heuristic) -> nb::object {
-              ogdfpy::require_node(source, "a_star_search", "source");
-              ogdfpy::require_node(target, "a_star_search", "target");
+              ogdfpy::require_node_of(g, source, "a_star_search", "source");
+              ogdfpy::require_node_of(g, target, "a_star_search", "target");
               ogdfpy::require_same_graph(cost, g, "a_star_search", "cost");
               ogdfpy::require_non_negative(cost, g, "a_star_search", "cost");
               // The heuristic is an optional Python callable node -> float; a
               // zero heuristic makes A* equivalent to Dijkstra.
               std::function<double(node)> h = [](node) { return 0.0; };
               if (!heuristic.is_none()) {
-                  h = [heuristic](node v) {
+                  h = [heuristic, &g](node v) {
                       return nb::cast<double>(
-                          heuristic(nb::cast(v, nb::rv_policy::reference)));
+                          heuristic(ogdfpy::to_python(v, g)));
                   };
               }
               NodeArray<edge> predecessor(g);
@@ -572,7 +719,7 @@ void register_algorithms(nb::module_& m) {
               }
               nb::list path;
               for (edge e : reversed) {
-                  path.append(nb::cast(e, nb::rv_policy::reference));
+                  path.append(ogdfpy::to_python(e, g));
               }
               return nb::make_tuple(length, path);
           },
@@ -594,6 +741,8 @@ void register_algorithms(nb::module_& m) {
                                          "maximum_weight_matching", "weight");
               ogdfpy::require_same_graph(matching, g,
                                          "maximum_weight_matching", "matching");
+              ogdfpy::require_no_nan(weight, g, "maximum_weight_matching",
+                                     "weight");
               std::unordered_set<edge> matched;
               MatchingBlossomV<double>().maximumWeightMatching(g, weight,
                                                                matched);
@@ -617,15 +766,49 @@ void register_algorithms(nb::module_& m) {
           [](const Graph& g, const EdgeArray<int>& lower_bound,
              const EdgeArray<int>& upper_bound, const EdgeArray<double>& cost,
              const NodeArray<int>& supply, EdgeArray<int>& flow) {
-              return MinCostFlowReinelt<double>().call(
+              const char* op = "min_cost_flow";
+              ogdfpy::require_same_graph(lower_bound, g, op, "lower_bound");
+              ogdfpy::require_same_graph(upper_bound, g, op, "upper_bound");
+              ogdfpy::require_same_graph(cost, g, op, "cost");
+              ogdfpy::require_same_graph(supply, g, op, "supply");
+              ogdfpy::require_same_graph(flow, g, op, "flow");
+              ogdfpy::require_connected(g, op);
+              for (edge e : g.edges) {
+                  ogdfpy::require_arg(
+                      lower_bound[e] <= upper_bound[e], op,
+                      "lower_bound exceeds upper_bound on edge " +
+                          std::to_string(e->index()));
+                  ogdfpy::require_arg(std::isfinite(cost[e]), op,
+                                      "cost is not finite on edge " +
+                                          std::to_string(e->index()));
+              }
+              std::int64_t total = 0;
+              for (node v : g.nodes) {
+                  total += supply[v];
+              }
+              ogdfpy::require_arg(total == 0, op, "supplies must sum to zero");
+              const bool ok = MinCostFlowReinelt<double>().call(
                   g, lower_bound, upper_bound, cost, supply, flow);
+              // Reinelt reports success with a zero flow on a one-edge
+              // network, so verify every solution it calls feasible.
+              double value = 0.0;
+              if (ok && !MinCostFlowModule<double>::checkComputedFlow(
+                            g, lower_bound, upper_bound, cost, supply, flow,
+                            value)) {
+                  throw ogdfpy::AlgorithmError(
+                      "min_cost_flow: OGDF returned a flow that violates the "
+                      "bounds or flow conservation");
+              }
+              return ok;
           },
           "graph"_a, "lower_bound"_a, "upper_bound"_a, "cost"_a, "supply"_a,
           "flow"_a,
-          "Minimum-cost flow (Reinelt). Bounds, supply, and flow are integers; "
-          "cost is a float. Node supply is positive for sources and negative "
-          "for sinks and must sum to zero. Returns False if infeasible; writes "
-          "per-edge flow into `flow`.");
+          "Minimum-cost flow (Reinelt) on a connected graph. Bounds, supply, "
+          "and flow are integers, with lower_bound <= upper_bound; cost is a "
+          "finite float. Node supply is positive for sources and negative for "
+          "sinks and must sum to zero. Returns False if infeasible; writes "
+          "per-edge flow into `flow`. Raises AlgorithmError if OGDF reports a "
+          "flow that fails verification.");
 
     // ---------------------------------------------------------------- //
     // Minimum Steiner tree                                             //
@@ -652,8 +835,20 @@ void register_algorithms(nb::module_& m) {
 
               List<node> terms;
               NodeArray<bool> is_terminal(ewg, false);
+              NodeArray<int> component(g);
+              connectedComponents(g, component);
+              int terminal_component = -1;
               for (auto handle : terminals) {
-                  node v2 = to_ewg[nb::cast<node>(handle)];
+                  node v = handle_of<node>(handle, g, "steiner_tree",
+                                           "terminals", "Node");
+                  if (terminal_component == -1) {
+                      terminal_component = component[v];
+                  } else if (component[v] != terminal_component) {
+                      throw ogdfpy::InvalidGraphError(
+                          "steiner_tree requires all terminals to lie in one "
+                          "connected component");
+                  }
+                  node v2 = to_ewg[v];
                   if (!is_terminal[v2]) {
                       is_terminal[v2] = true;
                       terms.pushBack(v2);
@@ -669,8 +864,8 @@ void register_algorithms(nb::module_& m) {
                   for (edge te : tree->edges) {
                       edge ewg_edge = tree->original(te);
                       if (ewg_edge != nullptr) {
-                          edges.append(nb::cast(to_user_edge[ewg_edge],
-                                                nb::rv_policy::reference));
+                          edges.append(
+                              ogdfpy::to_python(to_user_edge[ewg_edge], g));
                       }
                   }
                   delete tree;
@@ -692,7 +887,7 @@ void register_algorithms(nb::module_& m) {
               MaximalPlanarSubgraphSimple<int>().call(g, del_edges);
               nb::list out;
               for (edge e : del_edges) {
-                  out.append(nb::cast(e, nb::rv_policy::reference));
+                  out.append(ogdfpy::to_python(e, g));
               }
               return out;
           },
@@ -738,7 +933,8 @@ void register_algorithms(nb::module_& m) {
               List<edge> want;
               std::unordered_set<edge> seen;
               for (auto handle : edges) {
-                  edge e = nb::cast<edge>(handle);
+                  edge e = handle_of<edge>(handle, g, "insert_edges", "edges",
+                                           "Edge");
                   if (seen.insert(e).second) {
                       want.pushBack(e);
                   }
@@ -801,8 +997,7 @@ void register_algorithms(nb::module_& m) {
                               for (adjEntry adj : v->adjEntries) {
                                   edge other = prl.original(adj->theEdge());
                                   if (other != nullptr && other != e) {
-                                      route.append(nb::cast(
-                                          other, nb::rv_policy::reference));
+                                      route.append(ogdfpy::to_python(other, g));
                                       break;
                                   }
                               }
@@ -810,7 +1005,7 @@ void register_algorithms(nb::module_& m) {
                           prev = ce;
                       }
                       result.append(nb::make_tuple(
-                          nb::cast(e, nb::rv_policy::reference), route));
+                          ogdfpy::to_python(e, g), route));
                   }
               }
               return result;
@@ -833,8 +1028,8 @@ void register_algorithms(nb::module_& m) {
               isTriconnected(g, s1, s2);
               if (s1 != nullptr && s2 != nullptr) {
                   return nb::make_tuple(
-                      nb::cast(s1, nb::rv_policy::reference),
-                      nb::cast(s2, nb::rv_policy::reference));
+                      ogdfpy::to_python(s1, g),
+                      ogdfpy::to_python(s2, g));
               }
               return nb::none();
           },

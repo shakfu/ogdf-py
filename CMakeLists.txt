@@ -177,3 +177,16 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/_core.pyi DESTINATION ogdf)
 # without this the site-packages ogdf/ dir has _core.pyi but no py.typed marker,
 # and mypy refuses to use the stub.
 install(FILES ${CMAKE_SOURCE_DIR}/src/ogdf/py.typed DESTINATION ogdf)
+
+# The extension statically links OGDF (GPL v2/v3 with a linking exception),
+# COIN-OR (EPL 1.0), ABACUS (LGPL) and Minisat (MIT). Ship OGDF's licence texts
+# with every wheel; OGDF's LICENSE.txt lists the third-party components.
+foreach(_lic LICENSE.txt LICENSE_GPL_v2.txt LICENSE_GPL_v3.txt)
+    if(EXISTS "${OGDF_ROOT}/${_lic}")
+        install(FILES "${OGDF_ROOT}/${_lic}" DESTINATION ogdf/_licenses/ogdf)
+    endif()
+endforeach()
+if(EXISTS "${OGDF_ROOT}/include/ogdf/lib/minisat/LICENSE")
+    install(FILES "${OGDF_ROOT}/include/ogdf/lib/minisat/LICENSE"
+            DESTINATION ogdf/_licenses/ogdf RENAME LICENSE_minisat.txt)
+endif()

@@ -1,9 +1,12 @@
 // Graph generators.
 
 #include "bindings.h"
+#include "errors.h"
 
 #include <nanobind/stl/vector.h>
 
+#include <cmath>
+#include <string>
 #include <vector>
 
 #include <ogdf/basic/Array.h>
@@ -25,45 +28,123 @@ Array<int> to_array(const std::vector<int>& values) {
     return arr;
 }
 
+using ogdfpy::require_arg;
+
+void require_count(int value, int minimum, const char* op, const char* arg) {
+    require_arg(value >= minimum, op,
+                std::string(arg) + " must be >= " + std::to_string(minimum));
+}
+
+void require_probability(double p, const char* op, const char* arg) {
+    require_arg(p >= 0.0 && p <= 1.0, op,
+                std::string(arg) + " must be in [0, 1]");
+}
+
 }  // namespace
 
 void register_generators(nb::module_& m) {
     // --- deterministic --- //
-    m.def("complete_graph", &completeGraph, "graph"_a, "n"_a,
+    m.def("complete_graph",
+          [](Graph& g, int n) {
+              require_count(n, 0, "complete_graph", "n");
+              completeGraph(g, n);
+          },
+          "graph"_a, "n"_a,
           "Complete graph on n nodes.");
-    m.def("complete_bipartite_graph", &completeBipartiteGraph, "graph"_a,
-          "n"_a, "m"_a, "Complete bipartite graph K(n,m).");
-    m.def("wheel_graph", &wheelGraph, "graph"_a, "n"_a,
+    m.def("complete_bipartite_graph",
+          [](Graph& g, int n, int mm) {
+              require_count(n, 0, "complete_bipartite_graph", "n");
+              require_count(mm, 0, "complete_bipartite_graph", "m");
+              completeBipartiteGraph(g, n, mm);
+          },
+          "graph"_a, "n"_a, "m"_a, "Complete bipartite graph K(n,m).");
+    m.def("wheel_graph",
+          [](Graph& g, int n) {
+              require_count(n, 2, "wheel_graph", "n");
+              wheelGraph(g, n);
+          },
+          "graph"_a, "n"_a,
           "Wheel graph: a cycle of n nodes plus a hub.");
-    m.def("cube_graph", &cubeGraph, "graph"_a, "n"_a,
+    // 1 << n overflows int for n >= 31.
+    m.def("cube_graph",
+          [](Graph& g, int n) {
+              require_arg(n >= 0 && n <= 30, "cube_graph",
+                          "n must be in [0, 30]");
+              cubeGraph(g, n);
+          },
+          "graph"_a, "n"_a,
           "n-dimensional hypercube graph.");
     m.def("grid_graph",
           [](Graph& g, int n, int mm, bool loop_n, bool loop_m) {
+              require_count(n, 0, "grid_graph", "n");
+              require_count(mm, 0, "grid_graph", "m");
+              require_arg(!(loop_n || loop_m) || (n >= 1 && mm >= 1),
+                          "grid_graph",
+                          "a toroidal grid needs n >= 1 and m >= 1");
               gridGraph(g, n, mm, loop_n, loop_m);
           },
           "graph"_a, "n"_a, "m"_a, "loop_n"_a = false, "loop_m"_a = false,
           "n x m grid graph (optionally toroidal in each dimension).");
     m.def("petersen_graph",
-          [](Graph& g, int n, int mm) { petersenGraph(g, n, mm); },
+          [](Graph& g, int n, int mm) {
+              require_count(n, 3, "petersen_graph", "n");
+              require_arg(mm >= 1 && 2 * mm < n, "petersen_graph",
+                          "m must satisfy 1 <= m < n / 2");
+              petersenGraph(g, n, mm);
+          },
           "graph"_a, "n"_a = 5, "m"_a = 2, "Generalized Petersen graph.");
-    m.def("regular_tree", &regularTree, "graph"_a, "n"_a, "children"_a,
+    m.def("regular_tree",
+          [](Graph& g, int n, int children) {
+              require_count(n, 0, "regular_tree", "n");
+              require_count(children, 1, "regular_tree", "children");
+              regularTree(g, n, children);
+          },
+          "graph"_a, "n"_a, "children"_a,
           "Rooted tree with n nodes where each has `children` children.");
-    m.def("empty_graph", &emptyGraph, "graph"_a, "nodes"_a,
+    m.def("empty_graph",
+          [](Graph& g, int nodes) {
+              require_count(nodes, 0, "empty_graph", "nodes");
+              emptyGraph(g, nodes);
+          },
+          "graph"_a, "nodes"_a,
           "Graph with the given number of isolated nodes.");
 
     // --- random --- //
     m.def("random_graph",
-          [](Graph& g, int n, int edges) { randomGraph(g, n, edges); },
+          [](Graph& g, int n, int edges) {
+              require_count(n, 0, "random_graph", "nodes");
+              require_count(edges, 0, "random_graph", "edges");
+              require_arg(n > 0 || edges == 0, "random_graph",
+                          "edges require at least one node");
+              randomGraph(g, n, edges);
+          },
           "graph"_a, "nodes"_a, "edges"_a,
           "Random graph with n nodes and m edges.");
-    m.def("random_tree", [](Graph& g, int n) { randomTree(g, n); },
+    m.def("random_tree",
+          [](Graph& g, int n) {
+              require_count(n, 0, "random_tree", "nodes");
+              randomTree(g, n);
+          },
           "graph"_a, "nodes"_a, "Random tree with n nodes.");
     m.def("random_digraph",
-          [](Graph& g, int n, double p) { randomDigraph(g, n, p); },
+          [](Graph& g, int n, double p) {
+              require_count(n, 0, "random_digraph", "nodes");
+              require_probability(p, "random_digraph", "edge_probability");
+              randomDigraph(g, n, p);
+          },
           "graph"_a, "nodes"_a, "edge_probability"_a,
           "Random digraph on n nodes; each arc present with probability p.");
     m.def("random_regular_graph",
-          [](Graph& g, int n, int d) { randomRegularGraph(g, n, d); },
+          [](Graph& g, int n, int d) {
+              // An impossible (n, d) makes OGDF retry forever.
+              require_count(n, 0, "random_regular_graph", "nodes");
+              require_arg(d >= 0 && (n == 0 || d < n), "random_regular_graph",
+                          "degree must satisfy 0 <= degree < nodes");
+              require_arg((static_cast<long long>(n) * d) % 2 == 0,
+                          "random_regular_graph",
+                          "nodes * degree must be even");
+              randomRegularGraph(g, n, d);
+          },
           "graph"_a, "nodes"_a, "degree"_a,
           "Random d-regular graph on n nodes.");
     m.def("random_biconnected_graph",
@@ -96,8 +177,16 @@ void register_generators(nb::module_& m) {
     m.def("preferential_attachment_graph", &preferentialAttachmentGraph,
           "graph"_a, "nodes"_a, "min_degree"_a,
           "Barabasi-Albert preferential-attachment graph.");
-    m.def("random_watts_strogatz_graph", &randomWattsStrogatzGraph, "graph"_a,
-          "n"_a, "k"_a, "probability"_a,
+    m.def("random_watts_strogatz_graph",
+          [](Graph& g, int n, int k, double p) {
+              const char* op = "random_watts_strogatz_graph";
+              require_count(n, 0, op, "n");
+              require_arg(k >= 0 && k % 2 == 0 && 2 * k < n, op,
+                          "k must be even, >= 0 and smaller than n / 2");
+              require_probability(p, op, "probability");
+              randomWattsStrogatzGraph(g, n, k, p);
+          },
+          "graph"_a, "n"_a, "k"_a, "probability"_a,
           "Watts-Strogatz small-world graph (ring of degree k, rewired with "
           "the given probability).");
     m.def("random_chung_lu_graph",
@@ -120,11 +209,22 @@ void register_generators(nb::module_& m) {
           "graph"_a, "nodes"_a, "threshold"_a, "dimension"_a = 2,
           "Random geometric graph: points in a unit cube joined within "
           "`threshold` distance.");
-    m.def("random_hierarchy", &randomHierarchy, "graph"_a, "n"_a, "m"_a,
+    m.def("random_hierarchy",
+          [](Graph& g, int n, int mm, bool planar, bool single_source,
+             bool long_edges) {
+              require_count(n, 0, "random_hierarchy", "n");
+              require_count(mm, 0, "random_hierarchy", "m");
+              randomHierarchy(g, n, mm, planar, single_source, long_edges);
+          },
+          "graph"_a, "n"_a, "m"_a,
           "planar"_a, "single_source"_a, "long_edges"_a,
           "Random layered hierarchy with n nodes and m edges.");
     m.def("random_series_parallel_dag",
           [](Graph& g, int edges, double p, double flt) {
+              const char* op = "random_series_parallel_dag";
+              require_count(edges, 1, op, "edges");
+              require_probability(p, op, "randomness");
+              require_arg(flt >= 0.0 && flt < 1.0, op, "flt must be in [0, 1)");
               randomSeriesParallelDAG(g, edges, p, flt);
           },
           "graph"_a, "edges"_a, "randomness"_a = 0.5, "flt"_a = 0.0,
@@ -143,17 +243,42 @@ void register_generators(nb::module_& m) {
           },
           "graph"_a, "part_sizes"_a,
           "Complete k-partite graph with the given part sizes.");
-    m.def("globe_graph", &globeGraph, "graph"_a, "meridians"_a, "latitudes"_a,
+    m.def("globe_graph",
+          [](Graph& g, int meridians, int latitudes) {
+              require_count(meridians, 1, "globe_graph", "meridians");
+              require_count(latitudes, 1, "globe_graph", "latitudes");
+              globeGraph(g, meridians, latitudes);
+          },
+          "graph"_a, "meridians"_a, "latitudes"_a,
           "Globe graph with the given meridians and latitudes.");
-    m.def("regular_lattice_graph", &regularLatticeGraph, "graph"_a, "n"_a,
-          "k"_a,
+    m.def("regular_lattice_graph",
+          [](Graph& g, int n, int k) {
+              require_count(n, 4, "regular_lattice_graph", "n");
+              require_arg(k >= 0 && k % 2 == 0 && k <= n - 2,
+                          "regular_lattice_graph",
+                          "k must be even and in [0, n - 2]");
+              regularLatticeGraph(g, n, k);
+          },
+          "graph"_a, "n"_a, "k"_a,
           "Regular lattice graph: a ring of n nodes each joined to its k "
           "nearest neighbours.");
-    m.def("suspension", &suspension, "graph"_a, "s"_a,
+    m.def("suspension",
+          [](Graph& g, int s) {
+              require_count(s, 0, "suspension", "s");
+              suspension(g, s);
+          },
+          "graph"_a, "s"_a,
           "Add s suspension nodes, each joined to every existing node.");
 
     // --- operations --- //
-    m.def("graph_union", [](Graph& g1, const Graph& g2) { graphUnion(g1, g2); },
+    // graphUnion iterates graph2 while adding to graph1, so aliasing does not
+    // terminate.
+    m.def("graph_union",
+          [](Graph& g1, const Graph& g2) {
+              require_arg(&g1 != &g2, "graph_union",
+                          "graph1 and graph2 must be different graphs");
+              graphUnion(g1, g2);
+          },
           "graph1"_a, "graph2"_a,
           "Merge graph2 into graph1 (disjoint union, in place).");
     m.def("complement",
@@ -168,7 +293,11 @@ void register_generators(nb::module_& m) {
                                    NodeArray<NodeArray<node>>&),
                         const char* doc) {
         m.def(name,
-              [fn](const Graph& g1, const Graph& g2, Graph& out) {
+              [fn, name](const Graph& g1, const Graph& g2, Graph& out) {
+                  // `product` is cleared first, so it must not be an input.
+                  require_arg(&out != &g1 && &out != &g2, name,
+                              "product must be a different graph from the "
+                              "inputs");
                   NodeArray<NodeArray<node>> node_map;
                   fn(g1, g2, out, node_map);
               },

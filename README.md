@@ -4,7 +4,17 @@ Python bindings for the [Open Graph Drawing Framework (OGDF)](https://ogdf.githu
 
 This is a curated subset of OGDF, not a full wrapper: enough to build graphs, run layout and core graph algorithms, style and draw them, and read/write common graph file formats.
 
-## Quick Start
+## Installation
+
+```bash
+pip install ogdf-py
+```
+
+The distribution is `ogdf-py`; the import name is `ogdf`. Binary wheels cover CPython 3.10-3.14 on Linux (x86_64, aarch64), macOS (x86_64, arm64), and Windows (AMD64). Other platforms build OGDF from the source distribution at install time. See [Getting Started](https://shakfu.github.io/ogdf-py/getting-started/) for the support matrix and source-build requirements.
+
+Wheels and the sdist are also attached to each [GitHub release](https://github.com/shakfu/ogdf-py/releases).
+
+## Building from source
 
 ```bash
 make bootstrap   # clone OGDF at the pinned tag and build it from source (once)
@@ -81,3 +91,7 @@ The documentation site (`docs/`) includes a getting-started guide, a [coverage c
 `scripts/bootstrap_ogdf.py` shallow-clones OGDF at a pinned release tag (`foxglove-202510`) into `thirdparty/ogdf` and builds its static libraries from source. The extension then links the OGDF / COIN static libraries, so wheels are self-contained. Because OGDF is prebuilt once (a couple of minutes), rebuilding the bindings only recompiles the binding sources and is fast.
 
 The bootstrap script (`scripts/bootstrap_ogdf.py`) is cross-platform (Linux, macOS, Windows). The pin can be overridden: `python scripts/bootstrap_ogdf.py --tag <tag>` or `OGDF_TAG=<tag> make bootstrap`. In CI, run the bootstrap once per platform (e.g. in `cibuildwheel`'s `CIBW_BEFORE_ALL`) so OGDF is reused across all Python versions.
+
+## License
+
+GPL, version 2 or 3, with the linking exception for COIN-OR and Tulip that OGDF grants. See [`LICENSE`](LICENSE). Wheels statically link OGDF and include its licence texts under `ogdf/_licenses/ogdf/`.

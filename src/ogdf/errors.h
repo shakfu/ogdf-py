@@ -16,8 +16,12 @@
 
 #include "bindings.h"
 
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include <ogdf/basic/Graph.h>
 #include <ogdf/basic/GraphAttributes.h>
@@ -158,13 +162,177 @@ inline void require_same_graph(const Array& a, const ogdf::Graph& g,
     }
 }
 
-// NodeElement::graphOf() exists only in an OGDF debug build, so a node handle
-// from another graph cannot be detected here; the array check above is the
-// enforceable half of that contract.
-inline void require_node(ogdf::node v, const char* op, const char* arg) {
-    if (v == nullptr) {
+// --- handle validity ------------------------------------------------------ //
+//
+// A Node or Edge is a raw pointer owned by its Graph. A release build of OGDF
+// cannot map a handle to its graph, and a Python handle can outlive the element
+// it names. Two mechanisms cover this, both driven by a GraphObserver attached
+// to every Graph created from Python:
+//
+// - Liveness. When OGDF deletes an element, the Python instance wrapping it (if
+//   any) is marked not ready, so nanobind refuses it as an argument with a
+//   TypeError and a RuntimeWarning. Accessors therefore need no check. When a
+//   new element reuses the address, the instance is marked ready again and then
+//   names the new element; that is wrong-but-safe.
+// - Membership. Each graph keeps its elements in arrays indexed by element
+//   index, so `table[v->index()] == v` decides whether a live handle belongs to
+//   that graph. Filling the arrays is sequential, so generators stay cheap.
+//
+// An earlier version kept a global address -> graph hash table. A lookup there
+// cost a cache miss per access: 3x slower array access and generators.
+// Everything here runs inside OGDF calls made with the GIL held.
+
+class HandleTracker;
+
+inline std::unordered_map<const ogdf::Graph*, HandleTracker*>& trackers() {
+    static std::unordered_map<const ogdf::Graph*, HandleTracker*> map;
+    return map;
+}
+
+// Created by Graph.__init__; deletes itself when the Graph is destroyed
+// (~Graph calls clearObservers first, while its elements still exist).
+class HandleTracker final : public ogdf::GraphObserver {
+public:
+    explicit HandleTracker(const ogdf::Graph& g) {
+        trackers()[&g] = this;
+        reregister(&g);
+    }
+
+    void nodeAdded(ogdf::node v) override {
+        slot(nodes_, v->index()) = v;
+        revive(v);
+    }
+    void nodeDeleted(ogdf::node v) override {
+        nodes_[v->index()] = nullptr;
+        invalidate(v);
+    }
+    void edgeAdded(ogdf::edge e) override {
+        slot(edges_, e->index()) = e;
+        revive(e);
+    }
+    void edgeDeleted(ogdf::edge e) override {
+        edges_[e->index()] = nullptr;
+        invalidate(e);
+    }
+    void cleared() override { forget(*getGraph()); }
+
+    void registrationChanged(const ogdf::Graph* old) override {
+        if (getGraph() == nullptr && old != nullptr) {
+            forget(*old);
+            trackers().erase(old);
+            delete this;  // nothing touches *this after this callback returns
+        }
+    }
+
+    // `v` must be live: dereferencing it reads its index.
+    bool owns(ogdf::node v) const { return owns(nodes_, v); }
+    bool owns(ogdf::edge e) const { return owns(edges_, e); }
+
+private:
+    template <typename Handle>
+    static bool owns(const std::vector<Handle>& table, Handle h) {
+        const auto i = static_cast<std::size_t>(h->index());
+        return i < table.size() && table[i] == h;
+    }
+
+    template <typename Handle>
+    static Handle& slot(std::vector<Handle>& table, int index) {
+        const auto i = static_cast<std::size_t>(index);
+        if (i >= table.size()) {
+            table.resize(std::max(i + 1, 2 * table.size()), nullptr);
+        }
+        return table[i];
+    }
+
+    template <typename Element>
+    static void invalidate(Element* h) {
+        nb::object inst = nb::find(*h);
+        if (inst.is_valid()) {
+            nb::inst_set_state(inst, false, false);
+        }
+    }
+
+    template <typename Element>
+    static void revive(Element* h) {
+        nb::object inst = nb::find(*h);
+        if (inst.is_valid() && !nb::inst_ready(inst)) {
+            nb::inst_set_state(inst, true, false);
+        }
+    }
+
+    void forget(const ogdf::Graph& g) {
+        for (ogdf::node v : g.nodes) {
+            invalidate(v);
+        }
+        for (ogdf::edge e : g.edges) {
+            invalidate(e);
+        }
+        nodes_.clear();
+        edges_.clear();
+    }
+
+    std::vector<ogdf::node> nodes_;
+    std::vector<ogdf::edge> edges_;
+};
+
+template <typename Handle>
+inline void require_element_of(const ogdf::Graph& g, Handle h, const char* op,
+                               const char* arg, const char* kind) {
+    if (h == nullptr) {
         throw PreconditionError(std::string(op) + ": '" + arg +
                                 "' must not be None");
+    }
+    auto it = trackers().find(&g);
+    if (it == trackers().end() || !it->second->owns(h)) {
+        throw PreconditionError(std::string(op) + ": '" + arg + "' is a " +
+                                kind + " of a different graph");
+    }
+}
+
+inline void require_node_of(const ogdf::Graph& g, ogdf::node v, const char* op,
+                            const char* arg) {
+    require_element_of(g, v, op, arg, "node");
+}
+
+inline void require_edge_of(const ogdf::Graph& g, ogdf::edge e, const char* op,
+                            const char* arg) {
+    require_element_of(g, e, op, arg, "edge");
+}
+
+// Cast a handle for return to Python, keeping its Graph alive. Used for the
+// short lists algorithms return; iterators use rv_policy::reference, since a
+// keep-alive record per handle costs memory and graph destruction invalidates
+// the handles anyway.
+template <typename Handle>
+inline nb::object to_python(Handle h, const ogdf::Graph& g) {
+    if (h == nullptr) {
+        return nb::none();
+    }
+    nb::object parent = nb::find(g);
+    if (!parent.is_valid()) {
+        return nb::cast(h, nb::rv_policy::reference);
+    }
+    return nb::cast(h, nb::rv_policy::reference_internal, parent);
+}
+
+// Layouts, metrics, transforms and drawing writers read coordinates, sizes and
+// bends, which exist only when these flags are enabled.
+inline void require_graphics(const ogdf::GraphAttributes& ga, const char* op) {
+    const long needed = ogdf::GraphAttributes::nodeGraphics |
+                        ogdf::GraphAttributes::edgeGraphics;
+    if (!ga.has(needed)) {
+        throw PreconditionError(
+            std::string(op) +
+            " requires GraphAttributes with NODE_GRAPHICS and EDGE_GRAPHICS");
+    }
+}
+
+inline void require_attribute(const ogdf::GraphAttributes& ga, long flag,
+                              const char* flag_name, const char* op) {
+    if (!ga.has(flag)) {
+        throw PreconditionError(std::string(op) + " requires the " + flag_name +
+                                " attribute; create the GraphAttributes with " +
+                                flag_name + " (or ALL_ATTRIBUTES)");
     }
 }
 
@@ -176,11 +344,32 @@ inline void require_non_negative(const ogdf::EdgeArray<T>& a,
                                  const ogdf::Graph& g, const char* op,
                                  const char* arg) {
     for (ogdf::edge e : g.edges) {
-        if (a[e] < T(0)) {
+        // Written as !(x >= 0) so NaN is rejected too.
+        if (!(a[e] >= T(0))) {
             throw PreconditionError(std::string(op) + " requires non-negative '" +
                                     arg + "' values (edge " +
-                                    std::to_string(e->index()) + " is negative)");
+                                    std::to_string(e->index()) +
+                                    " is negative or NaN)");
         }
+    }
+}
+
+template <typename T>
+inline void require_no_nan(const ogdf::EdgeArray<T>& a, const ogdf::Graph& g,
+                           const char* op, const char* arg) {
+    for (ogdf::edge e : g.edges) {
+        if (std::isnan(static_cast<double>(a[e]))) {
+            throw PreconditionError(std::string(op) + ": '" + arg +
+                                    "' is NaN on edge " +
+                                    std::to_string(e->index()));
+        }
+    }
+}
+
+// Generator and setter arguments.
+inline void require_arg(bool ok, const char* op, const std::string& what) {
+    if (!ok) {
+        throw PreconditionError(std::string(op) + ": " + what);
     }
 }
 

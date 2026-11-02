@@ -1,6 +1,7 @@
 // Core graph model: Graph, Node, Edge, attribute arrays, GraphAttributes.
 
 #include "bindings.h"
+#include "errors.h"
 
 #include <nanobind/make_iterator.h>
 #include <nanobind/stl/string.h>
@@ -12,10 +13,15 @@
 
 using namespace ogdf;
 using namespace nb::literals;
+using ogdfpy::require_attribute;
+using ogdfpy::require_edge_of;
+using ogdfpy::require_node_of;
 
 void register_graph(nb::module_& m) {
     // node / edge are raw pointers (NodeElement*/EdgeElement*) owned by the
     // Graph. Bind them as opaque handles; never let Python take ownership.
+    // A handle whose element was deleted is marked not ready, so nanobind
+    // rejects it before any of these run (see ogdfpy::HandleTracker).
     nb::class_<NodeElement>(m, "Node")
         .def_prop_ro("index", &NodeElement::index)
         .def_prop_ro("degree", &NodeElement::degree)
@@ -32,11 +38,19 @@ void register_graph(nb::module_& m) {
         });
 
     nb::class_<Graph>(m, "Graph")
-        .def(nb::init<>())
+        .def("__init__",
+             [](Graph* self) {
+                 new (self) Graph();
+                 new ogdfpy::HandleTracker(*self);  // owned by the Graph
+             })
         .def("new_node", [](Graph& g) { return g.newNode(); },
              nb::rv_policy::reference_internal, "Create and return a new node.")
         .def("new_edge",
-             [](Graph& g, node s, node t) { return g.newEdge(s, t); },
+             [](Graph& g, node s, node t) {
+                 require_node_of(g, s, "new_edge", "source");
+                 require_node_of(g, t, "new_edge", "target");
+                 return g.newEdge(s, t);
+             },
              "source"_a, "target"_a, nb::rv_policy::reference_internal,
              "Create and return a new edge from source to target.")
         .def("number_of_nodes", &Graph::numberOfNodes)
@@ -80,10 +94,20 @@ void register_graph(nb::module_& m) {
             .def(nb::init<const Graph&, T>(), "graph"_a, "default_value"_a,
                  nb::keep_alive<1, 2>())
             .def("__getitem__",
-                 [](NodeArray<T>& a, node v) -> T { return a[v]; })
+                 [](NodeArray<T>& a, node v) -> T {
+                     require_node_of(*a.graphOf(), v, "NodeArray", "node");
+                     return a[v];
+                 })
             .def("__setitem__",
-                 [](NodeArray<T>& a, node v, T val) { a[v] = val; })
-            .def("fill", [](NodeArray<T>& a, T val) { a.fill(val); }, "value"_a);
+                 [](NodeArray<T>& a, node v, T val) {
+                     require_node_of(*a.graphOf(), v, "NodeArray", "node");
+                     a[v] = val;
+                 })
+            .def("fill",
+                 [](NodeArray<T>& a, T val) {
+                     a.fill(val);
+                 },
+                 "value"_a);
     };
     auto bind_edge_array = [&m](const char* name, auto sample) {
         using T = decltype(sample);
@@ -92,10 +116,20 @@ void register_graph(nb::module_& m) {
             .def(nb::init<const Graph&, T>(), "graph"_a, "default_value"_a,
                  nb::keep_alive<1, 2>())
             .def("__getitem__",
-                 [](EdgeArray<T>& a, edge e) -> T { return a[e]; })
+                 [](EdgeArray<T>& a, edge e) -> T {
+                     require_edge_of(*a.graphOf(), e, "EdgeArray", "edge");
+                     return a[e];
+                 })
             .def("__setitem__",
-                 [](EdgeArray<T>& a, edge e, T val) { a[e] = val; })
-            .def("fill", [](EdgeArray<T>& a, T val) { a.fill(val); }, "value"_a);
+                 [](EdgeArray<T>& a, edge e, T val) {
+                     require_edge_of(*a.graphOf(), e, "EdgeArray", "edge");
+                     a[e] = val;
+                 })
+            .def("fill",
+                 [](EdgeArray<T>& a, T val) {
+                     a.fill(val);
+                 },
+                 "value"_a);
     };
     bind_node_array("NodeArrayInt", int{});
     bind_node_array("NodeArrayDouble", double{});
@@ -118,7 +152,9 @@ void register_graph(nb::module_& m) {
         .def_prop_rw("alpha", [](const Color& c) { return c.alpha(); },
                      [](Color& c, uint8_t v) { c.alpha(v); })
         .def("__repr__",
-             [](const Color& c) { return "<ogdf.Color " + c.toString() + ">"; });
+             [](const Color& c) {
+                 return "<ogdf.Color " + c.toString() + ">";
+             });
 
     nb::enum_<Shape>(m, "Shape")
         .value("RECT", Shape::Rect)
@@ -195,98 +231,274 @@ void register_graph(nb::module_& m) {
                      [](GraphAttributes& g, bool b) { g.directed() = b; },
                      "Whether the graph is written as directed by the file and "
                      "drawing writers.")
-        .def("x", [](GraphAttributes& g, node v) { return g.x(v); }, "node"_a)
-        .def("y", [](GraphAttributes& g, node v) { return g.y(v); }, "node"_a)
-        .def("set_x", [](GraphAttributes& g, node v, double v2) { g.x(v) = v2; },
-             "node"_a, "value"_a)
-        .def("set_y", [](GraphAttributes& g, node v, double v2) { g.y(v) = v2; },
-             "node"_a, "value"_a)
-        .def("width", [](GraphAttributes& g, node v) { return g.width(v); },
+        .def("x",
+             [](GraphAttributes& g, node v) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS", "GraphAttributes.x");
+                 require_node_of(g.constGraph(), v, "GraphAttributes.x",
+                                 "node");
+                 return g.x(v);
+             },
              "node"_a)
-        .def("height", [](GraphAttributes& g, node v) { return g.height(v); },
+        .def("y",
+             [](GraphAttributes& g, node v) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS", "GraphAttributes.y");
+                 require_node_of(g.constGraph(), v, "GraphAttributes.y",
+                                 "node");
+                 return g.y(v);
+             },
+             "node"_a)
+        .def("set_x",
+             [](GraphAttributes& g, node v, double v2) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS", "GraphAttributes.set_x");
+                 require_node_of(g.constGraph(), v, "GraphAttributes.set_x",
+                                 "node");
+                 g.x(v) = v2;
+             },
+             
+             "node"_a, "value"_a)
+        .def("set_y",
+             [](GraphAttributes& g, node v, double v2) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS", "GraphAttributes.set_y");
+                 require_node_of(g.constGraph(), v, "GraphAttributes.set_y",
+                                 "node");
+                 g.y(v) = v2;
+             },
+             
+             "node"_a, "value"_a)
+        .def("width",
+             [](GraphAttributes& g, node v) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS", "GraphAttributes.width");
+                 require_node_of(g.constGraph(), v, "GraphAttributes.width",
+                                 "node");
+                 return g.width(v);
+             },
+             
+             "node"_a)
+        .def("height",
+             [](GraphAttributes& g, node v) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS", "GraphAttributes.height");
+                 require_node_of(g.constGraph(), v, "GraphAttributes.height",
+                                 "node");
+                 return g.height(v);
+             },
+             
              "node"_a)
         .def("set_width",
-             [](GraphAttributes& g, node v, double w) { g.width(v) = w; },
+             [](GraphAttributes& g, node v, double w) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS",
+                                   "GraphAttributes.set_width");
+                 require_node_of(g.constGraph(), v, "GraphAttributes.set_width",
+                                 "node");
+                 g.width(v) = w;
+             },
              "node"_a, "value"_a)
         .def("set_height",
-             [](GraphAttributes& g, node v, double h) { g.height(v) = h; },
+             [](GraphAttributes& g, node v, double h) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS",
+                                   "GraphAttributes.set_height");
+                 require_node_of(g.constGraph(), v,
+                                 "GraphAttributes.set_height", "node");
+                 g.height(v) = h;
+             },
              "node"_a, "value"_a)
         // Labels require the nodeLabel / edgeLabel flags to be enabled.
         .def("node_label",
-             [](GraphAttributes& g, node v) { return g.label(v); }, "node"_a)
+             [](GraphAttributes& g, node v) {
+                 require_attribute(g, GraphAttributes::nodeLabel, "NODE_LABEL",
+                                   "GraphAttributes.node_label");
+                 require_node_of(g.constGraph(), v,
+                                 "GraphAttributes.node_label", "node");
+                 return g.label(v);
+             }, "node"_a)
         .def("set_node_label",
              [](GraphAttributes& g, node v, const std::string& s) {
+                 require_attribute(g, GraphAttributes::nodeLabel, "NODE_LABEL",
+                                   "GraphAttributes.set_node_label");
+                 require_node_of(g.constGraph(), v,
+                                 "GraphAttributes.set_node_label", "node");
                  g.label(v) = s;
              },
              "node"_a, "label"_a)
         .def("edge_label",
-             [](GraphAttributes& g, edge e) { return g.label(e); }, "edge"_a)
+             [](GraphAttributes& g, edge e) {
+                 require_attribute(g, GraphAttributes::edgeLabel, "EDGE_LABEL",
+                                   "GraphAttributes.edge_label");
+                 require_edge_of(g.constGraph(), e,
+                                 "GraphAttributes.edge_label", "edge");
+                 return g.label(e);
+             }, "edge"_a)
         .def("set_edge_label",
              [](GraphAttributes& g, edge e, const std::string& s) {
+                 require_attribute(g, GraphAttributes::edgeLabel, "EDGE_LABEL",
+                                   "GraphAttributes.set_edge_label");
+                 require_edge_of(g.constGraph(), e,
+                                 "GraphAttributes.set_edge_label", "edge");
                  g.label(e) = s;
              },
              "edge"_a, "label"_a)
         // --- node styling (shape needs nodeGraphics; rest need nodeStyle) --- //
-        .def("shape", [](GraphAttributes& g, node v) { return g.shape(v); },
+        .def("shape",
+             [](GraphAttributes& g, node v) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS", "GraphAttributes.shape");
+                 require_node_of(g.constGraph(), v, "GraphAttributes.shape",
+                                 "node");
+                 return g.shape(v);
+             },
+             
              "node"_a)
         .def("set_shape",
-             [](GraphAttributes& g, node v, Shape s) { g.shape(v) = s; },
+             [](GraphAttributes& g, node v, Shape s) {
+                 require_attribute(g, GraphAttributes::nodeGraphics,
+                                   "NODE_GRAPHICS",
+                                   "GraphAttributes.set_shape");
+                 require_node_of(g.constGraph(), v, "GraphAttributes.set_shape",
+                                 "node");
+                 g.shape(v) = s;
+             },
              "node"_a, "shape"_a)
         .def("fill_color",
-             [](GraphAttributes& g, node v) { return g.fillColor(v); },
+             [](GraphAttributes& g, node v) {
+                 require_attribute(g, GraphAttributes::nodeStyle, "NODE_STYLE",
+                                   "GraphAttributes.fill_color");
+                 require_node_of(g.constGraph(), v,
+                                 "GraphAttributes.fill_color", "node");
+                 return g.fillColor(v);
+             },
              "node"_a)
         .def("set_fill_color",
              [](GraphAttributes& g, node v, const Color& c) {
+                 require_attribute(g, GraphAttributes::nodeStyle, "NODE_STYLE",
+                                   "GraphAttributes.set_fill_color");
+                 require_node_of(g.constGraph(), v,
+                                 "GraphAttributes.set_fill_color", "node");
                  g.fillColor(v) = c;
              },
              "node"_a, "color"_a)
         .def("set_fill_pattern",
              [](GraphAttributes& g, node v, FillPattern p) {
+                 require_attribute(g, GraphAttributes::nodeStyle, "NODE_STYLE",
+                                   "GraphAttributes.set_fill_pattern");
+                 require_node_of(g.constGraph(), v,
+                                 "GraphAttributes.set_fill_pattern", "node");
                  g.fillPattern(v) = p;
              },
              "node"_a, "pattern"_a)
         .def("node_stroke_color",
-             [](GraphAttributes& g, node v) { return g.strokeColor(v); },
+             [](GraphAttributes& g, node v) {
+                 require_attribute(g, GraphAttributes::nodeStyle, "NODE_STYLE",
+                                   "GraphAttributes.node_stroke_color");
+                 require_node_of(g.constGraph(), v,
+                                 "GraphAttributes.node_stroke_color", "node");
+                 return g.strokeColor(v);
+             },
              "node"_a)
         .def("set_node_stroke_color",
              [](GraphAttributes& g, node v, const Color& c) {
+                 require_attribute(g, GraphAttributes::nodeStyle, "NODE_STYLE",
+                                   "GraphAttributes.set_node_stroke_color");
+                 require_node_of(g.constGraph(), v,
+                                 "GraphAttributes.set_node_stroke_color",
+                                 "node");
                  g.strokeColor(v) = c;
              },
              "node"_a, "color"_a)
         .def("set_node_stroke_width",
-             [](GraphAttributes& g, node v, float w) { g.strokeWidth(v) = w; },
+             [](GraphAttributes& g, node v, float w) {
+                 require_attribute(g, GraphAttributes::nodeStyle, "NODE_STYLE",
+                                   "GraphAttributes.set_node_stroke_width");
+                 require_node_of(g.constGraph(), v,
+                                 "GraphAttributes.set_node_stroke_width",
+                                 "node");
+                 g.strokeWidth(v) = w;
+             },
              "node"_a, "width"_a)
         // --- edge styling (need edgeStyle / edgeArrow / edgeGraphics) --- //
         .def("edge_stroke_color",
-             [](GraphAttributes& g, edge e) { return g.strokeColor(e); },
+             [](GraphAttributes& g, edge e) {
+                 require_attribute(g, GraphAttributes::edgeStyle, "EDGE_STYLE",
+                                   "GraphAttributes.edge_stroke_color");
+                 require_edge_of(g.constGraph(), e,
+                                 "GraphAttributes.edge_stroke_color", "edge");
+                 return g.strokeColor(e);
+             },
              "edge"_a)
         .def("set_edge_stroke_color",
              [](GraphAttributes& g, edge e, const Color& c) {
+                 require_attribute(g, GraphAttributes::edgeStyle, "EDGE_STYLE",
+                                   "GraphAttributes.set_edge_stroke_color");
+                 require_edge_of(g.constGraph(), e,
+                                 "GraphAttributes.set_edge_stroke_color",
+                                 "edge");
                  g.strokeColor(e) = c;
              },
              "edge"_a, "color"_a)
         .def("set_edge_stroke_width",
-             [](GraphAttributes& g, edge e, float w) { g.strokeWidth(e) = w; },
+             [](GraphAttributes& g, edge e, float w) {
+                 require_attribute(g, GraphAttributes::edgeStyle, "EDGE_STYLE",
+                                   "GraphAttributes.set_edge_stroke_width");
+                 require_edge_of(g.constGraph(), e,
+                                 "GraphAttributes.set_edge_stroke_width",
+                                 "edge");
+                 g.strokeWidth(e) = w;
+             },
              "edge"_a, "width"_a)
-        .def("arrow", [](GraphAttributes& g, edge e) { return g.arrowType(e); },
+        .def("arrow",
+             [](GraphAttributes& g, edge e) {
+                 require_attribute(g, GraphAttributes::edgeArrow, "EDGE_ARROW",
+                                   "GraphAttributes.arrow");
+                 require_edge_of(g.constGraph(), e, "GraphAttributes.arrow",
+                                 "edge");
+                 return g.arrowType(e);
+             },
+             
              "edge"_a)
         .def("set_arrow",
              [](GraphAttributes& g, edge e, EdgeArrow a) {
+                 require_attribute(g, GraphAttributes::edgeArrow, "EDGE_ARROW",
+                                   "GraphAttributes.set_arrow");
+                 require_edge_of(g.constGraph(), e, "GraphAttributes.set_arrow",
+                                 "edge");
                  g.arrowType(e) = a;
              },
              "edge"_a, "arrow"_a)
         .def("add_bend",
              [](GraphAttributes& g, edge e, double x, double y) {
+                 require_attribute(g, GraphAttributes::edgeGraphics,
+                                   "EDGE_GRAPHICS", "GraphAttributes.add_bend");
+                 require_edge_of(g.constGraph(), e, "GraphAttributes.add_bend",
+                                 "edge");
                  g.bends(e).pushBack(DPoint(x, y));
              },
              "edge"_a, "x"_a, "y"_a,
              "Append a bend point to an edge's polyline.")
         .def("clear_bends",
-             [](GraphAttributes& g, edge e) { g.bends(e).clear(); }, "edge"_a)
+             [](GraphAttributes& g, edge e) {
+                 require_attribute(g, GraphAttributes::edgeGraphics,
+                                   "EDGE_GRAPHICS",
+                                   "GraphAttributes.clear_bends");
+                 require_edge_of(g.constGraph(), e,
+                                 "GraphAttributes.clear_bends", "edge");
+                 g.bends(e).clear();
+             }, "edge"_a)
         .def("bounding_box_width",
-             [](GraphAttributes& g) { return g.boundingBox().width(); })
+             [](GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "bounding_box_width");
+                 return g.boundingBox().width();
+             })
         .def("bounding_box_height",
-             [](GraphAttributes& g) { return g.boundingBox().height(); });
+             [](GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "bounding_box_height");
+                 return g.boundingBox().height();
+             });
 
     // Attribute flag constants (combine with |).
     m.attr("NODE_GRAPHICS") = GraphAttributes::nodeGraphics;

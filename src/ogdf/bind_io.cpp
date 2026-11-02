@@ -36,6 +36,13 @@ void register_io(nb::module_& m) {
     // filename ergonomics.
     auto reader = [](bool (*fn)(GraphAttributes&, Graph&, std::istream&)) {
         return [fn](GraphAttributes& ga, Graph& g, const std::string& path) {
+            // OGDF asserts this pairing; a mismatch writes through the wrong
+            // graph's arrays.
+            if (&ga.constGraph() != &g) {
+                throw ogdfpy::PreconditionError(
+                    "read: the GraphAttributes belongs to a different graph "
+                    "than the one passed in");
+            }
             std::ifstream is(path);
             return is.good() && fn(ga, g, is);
         };
@@ -90,6 +97,9 @@ void register_io(nb::module_& m) {
                                                   "tlp",  "dl",   "rudy",
                                                   "svg"};
               const std::string ext = lower_extension(path);
+              if (ext == "svg") {
+                  ogdfpy::require_graphics(ga, "write");
+              }
               if (std::find(std::begin(kSupported), std::end(kSupported),
                             ext) == std::end(kSupported)) {
                   throw ogdfpy::UnsupportedFormatError(
@@ -108,12 +118,14 @@ void register_io(nb::module_& m) {
     // --- drawing output --- //
     m.def("draw_svg",
           [](const GraphAttributes& ga, const std::string& path) {
+              ogdfpy::require_graphics(ga, "draw_svg");
               return GraphIO::drawSVG(ga, path);
           },
           "graph_attributes"_a, "filename"_a,
           "Write the drawing to an SVG file. Returns True on success.");
     m.def("to_svg",
           [](const GraphAttributes& ga) {
+              ogdfpy::require_graphics(ga, "to_svg");
               std::ostringstream os;
               GraphIO::drawSVG(ga, os);
               return os.str();
@@ -121,6 +133,7 @@ void register_io(nb::module_& m) {
           "graph_attributes"_a, "Return the drawing as an SVG string.");
     m.def("draw_tikz",
           [](const GraphAttributes& ga, const std::string& path) {
+              ogdfpy::require_graphics(ga, "draw_tikz");
               std::ofstream os(path);
               return os.good() && GraphIO::drawTikz(ga, os);
           },
@@ -128,6 +141,7 @@ void register_io(nb::module_& m) {
           "Write the drawing as a TikZ (LaTeX/PGF) file.");
     m.def("to_tikz",
           [](const GraphAttributes& ga) {
+              ogdfpy::require_graphics(ga, "to_tikz");
               std::ostringstream os;
               GraphIO::drawTikz(ga, os);
               return os.str();

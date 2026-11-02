@@ -65,16 +65,19 @@ static void seed_circle_if_degenerate(GraphAttributes& ga) {
     }
 }
 
-// The planar grid layouts (FPP, PlanarStraight, PlanarDraw, MixedModel) require
-// a simple planar graph with at least 3 nodes; OGDF augments connectivity
-// internally but assumes planarity and simplicity. Guard here so bad input
-// raises a clear Python error instead of tripping an assertion or running into
-// undefined behaviour in a release build.
-static void require_simple_planar(const GraphAttributes& ga, const char* name) {
+// The planar grid layouts (FPP, PlanarStraight, PlanarDraw, MixedModel,
+// Schnyder) require a simple planar graph with at least 3 nodes. FPP,
+// MixedModel and Schnyder also crash on disconnected input; PlanarStraight and
+// PlanarDraw augment connectivity themselves.
+static void require_simple_planar(const GraphAttributes& ga, const char* name,
+                                  bool connected) {
     const Graph& g = ga.constGraph();
     ogdfpy::require_min_nodes(g, 3, name);
     ogdfpy::require_simple(g, name);
     ogdfpy::require_planar(g, name);
+    if (connected) {
+        ogdfpy::require_connected(g, name);
+    }
 }
 
 void register_layouts(nb::module_& m) {
@@ -100,10 +103,21 @@ void register_layouts(nb::module_& m) {
     // --- layouts --- //
     nb::class_<SugiyamaLayout>(m, "SugiyamaLayout")
         .def(nb::init<>())
-        .def("call", [](SugiyamaLayout& s, GraphAttributes& g) { s.call(g); },
+        .def("call",
+             [](SugiyamaLayout& s, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "SugiyamaLayout");
+                 s.call(g);
+             },
+             
              "graph_attributes"_a, "Compute a layered (Sugiyama) layout.")
         .def("set_fails", [](SugiyamaLayout& s, int n) { s.fails(n); }, "n"_a)
-        .def("set_runs", [](SugiyamaLayout& s, int n) { s.runs(n); }, "n"_a)
+        .def("set_runs",
+             [](SugiyamaLayout& s, int n) {
+                 ogdfpy::require_arg(n >= 1, "SugiyamaLayout.set_runs",
+                                     "n must be >= 1");
+                 s.runs(n);
+             },
+             "n"_a)
         .def("set_transpose",
              [](SugiyamaLayout& s, bool b) { s.transpose(b); }, "value"_a)
         .def("set_arrange_ccs",
@@ -120,7 +134,12 @@ void register_layouts(nb::module_& m) {
 
     nb::class_<FMMMLayout>(m, "FMMMLayout")
         .def(nb::init<>())
-        .def("call", [](FMMMLayout& f, GraphAttributes& g) { f.call(g); },
+        .def("call",
+             [](FMMMLayout& f, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "FMMMLayout");
+                 f.call(g);
+             },
+             
              "graph_attributes"_a, "Compute a force-directed (FMMM) layout.")
         .def("set_unit_edge_length",
              [](FMMMLayout& f, double x) { f.unitEdgeLength(x); }, "value"_a)
@@ -141,7 +160,10 @@ void register_layouts(nb::module_& m) {
     nb::class_<PlanarizationLayout>(m, "PlanarizationLayout")
         .def(nb::init<>())
         .def("call",
-             [](PlanarizationLayout& p, GraphAttributes& g) { p.call(g); },
+             [](PlanarizationLayout& p, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "PlanarizationLayout");
+                 p.call(g);
+             },
              "graph_attributes"_a, "Compute a planarization-based layout.")
         .def("use_orthogonal_layout",
              [](PlanarizationLayout& p, double separation) {
@@ -163,6 +185,7 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](TreeLayout& t, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "TreeLayout");
                  ogdfpy::require_forest(g.constGraph(), "TreeLayout");
                  t.call(g);
              },
@@ -185,7 +208,12 @@ void register_layouts(nb::module_& m) {
 
     nb::class_<CircularLayout>(m, "CircularLayout")
         .def(nb::init<>())
-        .def("call", [](CircularLayout& c, GraphAttributes& g) { c.call(g); },
+        .def("call",
+             [](CircularLayout& c, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "CircularLayout");
+                 c.call(g);
+             },
+             
              "graph_attributes"_a, "Compute a circular layout.")
         .def("set_min_dist_circle",
              [](CircularLayout& c, double x) { c.minDistCircle(x); }, "value"_a)
@@ -196,7 +224,10 @@ void register_layouts(nb::module_& m) {
     nb::class_<StressMinimization>(m, "StressMinimization")
         .def(nb::init<>())
         .def("call",
-             [](StressMinimization& s, GraphAttributes& g) { s.call(g); },
+             [](StressMinimization& s, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "StressMinimization");
+                 s.call(g);
+             },
              "graph_attributes"_a,
              "Compute a stress-minimization (MDS-style) layout.")
         .def("set_iterations",
@@ -215,17 +246,31 @@ void register_layouts(nb::module_& m) {
 
     nb::class_<PivotMDS>(m, "PivotMDS")
         .def(nb::init<>())
-        .def("call", [](PivotMDS& p, GraphAttributes& g) { p.call(g); },
+        .def("call",
+             [](PivotMDS& p, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "PivotMDS");
+                 p.call(g);
+             },
+             
              "graph_attributes"_a, "Compute a pivot-MDS layout (fast MDS).")
         .def("set_number_of_pivots",
              [](PivotMDS& p, int n) { p.setNumberOfPivots(n); }, "n"_a)
+        // Zero cost makes PivotMDS loop forever (PivotMDS.cpp: `while (r <
+        // EPSILON)`), with the GIL held.
         .def("set_edge_costs",
-             [](PivotMDS& p, double x) { p.setEdgeCosts(x); }, "value"_a);
+             [](PivotMDS& p, double x) {
+                 ogdfpy::require_arg(std::isfinite(x) && x > 0.0,
+                                     "PivotMDS.set_edge_costs",
+                                     "value must be finite and positive");
+                 p.setEdgeCosts(x);
+             },
+             "value"_a);
 
     nb::class_<GEMLayout>(m, "GEMLayout")
         .def(nb::init<>())
         .def("call",
              [](GEMLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "GEMLayout");
                  seed_circle_if_degenerate(g);
                  l.call(g);
              },
@@ -244,6 +289,7 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](SpringEmbedderKK& s, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "SpringEmbedderKK");
                  ogdfpy::require_connected(g.constGraph(), "SpringEmbedderKK");
                  seed_circle_if_degenerate(g);
                  s.call(g);
@@ -268,12 +314,13 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](SchnyderLayout& s, GraphAttributes& g) {
-                 require_simple_planar(g, "SchnyderLayout");
+                 ogdfpy::require_graphics(g, "SchnyderLayout");
+                 require_simple_planar(g, "SchnyderLayout", true);
                  s.call(g);
              },
              "graph_attributes"_a,
              "Compute a Schnyder straight-line planar grid layout (requires a "
-             "simple planar graph with at least 3 nodes).");
+             "simple, connected, planar graph with at least 3 nodes).");
 
     // Straight-line planar grid drawing (de Fraysseix, Pach, Pollack). Like
     // Schnyder, draws a simple planar graph without crossings on an integer
@@ -282,12 +329,14 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](FPPLayout& l, GraphAttributes& g) {
-                 require_simple_planar(g, "FPPLayout");
+                 ogdfpy::require_graphics(g, "FPPLayout");
+                 require_simple_planar(g, "FPPLayout", true);
                  l.call(g);
              },
              "graph_attributes"_a,
              "Compute a de Fraysseix-Pach-Pollack straight-line planar grid "
-             "layout (requires a simple planar graph with at least 3 nodes).")
+             "layout (requires a simple, connected, planar graph with at "
+             "least 3 nodes).")
         .def("set_separation",
              [](FPPLayout& l, double x) { l.separation(x); }, "value"_a,
              "Minimum distance between nodes.");
@@ -297,7 +346,8 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](PlanarStraightLayout& l, GraphAttributes& g) {
-                 require_simple_planar(g, "PlanarStraightLayout");
+                 ogdfpy::require_graphics(g, "PlanarStraightLayout");
+                 require_simple_planar(g, "PlanarStraightLayout", false);
                  l.call(g);
              },
              "graph_attributes"_a,
@@ -319,7 +369,8 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](PlanarDrawLayout& l, GraphAttributes& g) {
-                 require_simple_planar(g, "PlanarDrawLayout");
+                 ogdfpy::require_graphics(g, "PlanarDrawLayout");
+                 require_simple_planar(g, "PlanarDrawLayout", false);
                  l.call(g);
              },
              "graph_attributes"_a,
@@ -342,12 +393,13 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](MixedModelLayout& l, GraphAttributes& g) {
-                 require_simple_planar(g, "MixedModelLayout");
+                 ogdfpy::require_graphics(g, "MixedModelLayout");
+                 require_simple_planar(g, "MixedModelLayout", true);
                  l.call(g);
              },
              "graph_attributes"_a,
-             "Compute a mixed-model planar layout (requires a simple planar "
-             "graph with at least 3 nodes).")
+             "Compute a mixed-model planar layout (requires a simple, "
+             "connected, planar graph with at least 3 nodes).")
         .def("set_separation",
              [](MixedModelLayout& l, double x) { l.separation(x); }, "value"_a,
              "Minimum distance between nodes.");
@@ -362,6 +414,7 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](RadialTreeLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "RadialTreeLayout");
                  ogdfpy::require_tree(g.constGraph(), "RadialTreeLayout");
                  l.call(g);
              },
@@ -379,7 +432,12 @@ void register_layouts(nb::module_& m) {
     // Arc diagram: nodes on a line, edges drawn as semicircular arcs.
     nb::class_<LinearLayout>(m, "LinearLayout")
         .def(nb::init<>())
-        .def("call", [](LinearLayout& l, GraphAttributes& g) { l.call(g); },
+        .def("call",
+             [](LinearLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "LinearLayout");
+                 l.call(g);
+             },
+             
              "graph_attributes"_a,
              "Compute a linear (arc-diagram) layout.");
 
@@ -389,6 +447,7 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](TutteLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "TutteLayout");
                  const Graph& graph = g.constGraph();
                  ogdfpy::require_min_nodes(graph, 3, "TutteLayout");
                  ogdfpy::require_planar(graph, "TutteLayout");
@@ -405,12 +464,14 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](DominanceLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "DominanceLayout");
                  ogdfpy::require_non_empty(g.constGraph(), "DominanceLayout");
                  ogdfpy::require_acyclic(g.constGraph(), "DominanceLayout");
+                 ogdfpy::require_connected(g.constGraph(), "DominanceLayout");
                  l.call(g);
              },
              "graph_attributes"_a,
-             "Compute an upward dominance drawing (for a DAG).")
+             "Compute an upward dominance drawing (for a connected DAG).")
         .def("set_min_grid_distance",
              [](DominanceLayout& l, int d) { l.setMinGridDistance(d); },
              "value"_a);
@@ -419,12 +480,14 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](VisibilityLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "VisibilityLayout");
                  ogdfpy::require_non_empty(g.constGraph(), "VisibilityLayout");
                  ogdfpy::require_acyclic(g.constGraph(), "VisibilityLayout");
+                 ogdfpy::require_connected(g.constGraph(), "VisibilityLayout");
                  l.call(g);
              },
              "graph_attributes"_a,
-             "Compute an upward visibility drawing (for a DAG).")
+             "Compute an upward visibility drawing (for a connected DAG).")
         .def("set_min_grid_distance",
              [](VisibilityLayout& l, int d) { l.setMinGridDistance(d); },
              "value"_a);
@@ -434,7 +497,12 @@ void register_layouts(nb::module_& m) {
     // single-level layout) and handles disconnected graphs.
     nb::class_<MultilevelLayout>(m, "MultilevelLayout")
         .def(nb::init<>())
-        .def("call", [](MultilevelLayout& l, GraphAttributes& g) { l.call(g); },
+        .def("call",
+             [](MultilevelLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "MultilevelLayout");
+                 l.call(g);
+             },
+             
              "graph_attributes"_a,
              "Compute a multilevel force-directed layout (suited to large "
              "graphs).");
@@ -444,14 +512,19 @@ void register_layouts(nb::module_& m) {
     nb::class_<ModularMultilevelMixer>(m, "ModularMultilevelMixer")
         .def(nb::init<>())
         .def("call",
-             [](ModularMultilevelMixer& l, GraphAttributes& g) { l.call(g); },
+             [](ModularMultilevelMixer& l, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "ModularMultilevelMixer");
+                 l.call(g);
+             },
              "graph_attributes"_a,
              "Compute a multilevel layout via the modular mixer.")
         .def("set_layout_repeats",
              [](ModularMultilevelMixer& l, int n) { l.setLayoutRepeats(n); },
              "n"_a)
         .def("set_all_edge_lengths",
-             [](ModularMultilevelMixer& l, double x) { l.setAllEdgeLengths(x); },
+             [](ModularMultilevelMixer& l, double x) {
+                 l.setAllEdgeLengths(x);
+             },
              "value"_a);
 
     // Balloon layout: subtrees drawn in enclosing circles. Requires a
@@ -460,6 +533,7 @@ void register_layouts(nb::module_& m) {
         .def(nb::init<>())
         .def("call",
              [](BalloonLayout& l, GraphAttributes& g) {
+                 ogdfpy::require_graphics(g, "BalloonLayout");
                  ogdfpy::require_connected(g.constGraph(), "BalloonLayout");
                  l.call(g);
              },

@@ -177,13 +177,14 @@ def test_cut_reports_value_and_edges():
 def test_cut_value_matches_max_flow_by_duality():
     g = ogdf.Graph()
     with ogdf.seeded(5):
-        ogdf.random_digraph(g, 25, 60)
+        ogdf.random_digraph(g, 25, 0.3)
     nodes = list(g.nodes())
     source, sink = nodes[0], nodes[-1]
     capacity = ogdf.EdgeArrayDouble(g, 1.0)
 
     flow = ogdf.EdgeArrayDouble(g)
     value = ogdf.max_flow(g, capacity, source, sink, flow)
+    assert value > 0  # a zero flow would make the duality check trivial
     cut = ogdf.min_st_cut(g, capacity, source, sink, directed=True)
     assert cut.value == pytest.approx(value)
 

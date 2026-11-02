@@ -194,7 +194,7 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 ### Spanning trees, flow, cut
 
-- [x] `min_spanning_tree` (Prim), `make_minimum_spanning_tree` (Kruskal)
+- [x] `min_spanning_tree` (Kruskal; a spanning forest on disconnected input), `make_minimum_spanning_tree` (Kruskal)
 
 - [x] `max_flow` (Goldberg-Tarjan)
 

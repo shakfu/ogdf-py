@@ -58,6 +58,7 @@ void hop_distances(const Graph& g, node source, NodeArray<int>& distance) {
 void register_metrics(nb::module_& m) {
     m.def("count_crossings",
           [](const GraphAttributes& ga) {
+              ogdfpy::require_graphics(ga, "count_crossings");
               const Graph& g = ga.constGraph();
               std::vector<edge> edges;
               std::vector<std::vector<DPoint>> lines;
@@ -131,6 +132,7 @@ void register_metrics(nb::module_& m) {
 
     m.def("edge_lengths",
           [](const GraphAttributes& ga) {
+              ogdfpy::require_graphics(ga, "edge_lengths");
               std::vector<double> lengths;
               lengths.reserve(
                   static_cast<size_t>(ga.constGraph().numberOfEdges()));
@@ -151,6 +153,7 @@ void register_metrics(nb::module_& m) {
 
     m.def("bounding_box",
           [](const GraphAttributes& ga) {
+              ogdfpy::require_graphics(ga, "bounding_box");
               const Graph& g = ga.constGraph();
               if (g.empty()) {
                   return nb::make_tuple(0.0, 0.0, 0.0, 0.0);
@@ -183,6 +186,7 @@ void register_metrics(nb::module_& m) {
 
     m.def("node_overlaps",
           [](const GraphAttributes& ga) {
+              ogdfpy::require_graphics(ga, "node_overlaps");
               const Graph& g = ga.constGraph();
               long long pairs = 0;
               double area = 0.0;
@@ -221,6 +225,7 @@ void register_metrics(nb::module_& m) {
 
     m.def("min_angle",
           [](const GraphAttributes& ga) -> nb::object {
+              ogdfpy::require_graphics(ga, "min_angle");
               const Graph& g = ga.constGraph();
               double smallest = std::numeric_limits<double>::max();
               bool found = false;
@@ -273,6 +278,7 @@ void register_metrics(nb::module_& m) {
 
     m.def("stress",
           [](const GraphAttributes& ga, bool normalize) {
+              ogdfpy::require_graphics(ga, "stress");
               const Graph& g = ga.constGraph();
               if (g.numberOfNodes() < 2) {
                   return 0.0;

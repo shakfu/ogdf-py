@@ -99,6 +99,7 @@ Box extent_after_scale(const GraphAttributes& ga, double s,
 void register_transforms(nb::module_& m) {
     m.def("translate_drawing",
           [](GraphAttributes& ga, double dx, double dy) {
+              ogdfpy::require_graphics(ga, "translate_drawing");
               translate_all(ga, dx, dy);
           },
           "graph_attributes"_a, "dx"_a, "dy"_a,
@@ -107,6 +108,7 @@ void register_transforms(nb::module_& m) {
     m.def("scale_drawing",
           [](GraphAttributes& ga, double sx, double sy, double cx, double cy,
              bool scale_node_sizes) {
+              ogdfpy::require_graphics(ga, "scale_drawing");
               const Graph& g = ga.constGraph();
               for (node v : g.nodes) {
                   ga.x(v) = cx + (ga.x(v) - cx) * sx;
@@ -130,6 +132,7 @@ void register_transforms(nb::module_& m) {
     m.def("fit_scale",
           [](const GraphAttributes& ga, double width, double height,
              bool scale_node_sizes) {
+              ogdfpy::require_graphics(ga, "fit_scale");
               if (width <= 0.0 || height <= 0.0) {
                   throw ogdfpy::PreconditionError(
                       "fit_scale: width and height must be positive");
@@ -185,6 +188,7 @@ void register_transforms(nb::module_& m) {
 
     m.def("tile_components",
           [](GraphAttributes& ga, double separation, double page_ratio) {
+              ogdfpy::require_graphics(ga, "tile_components");
               if (separation < 0.0) {
                   throw ogdfpy::PreconditionError(
                       "tile_components: separation must not be negative");

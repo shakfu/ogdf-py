@@ -86,7 +86,7 @@ report is printed by `python -m ogdf`:
 $ python -m ogdf
 ogdf-py installation report
 
-  package version    : 0.5.1
+  package version    : 0.6.0
   OGDF version       : 2025.10 (pinned tag: foxglove-202510)
   OGDF system        : Unix/linux
   OGDF LP solver     : COIN-OR LP (Clp)
@@ -211,7 +211,7 @@ against like conditions:
 ```python
 >>> ogdf.set_seed(42)
 >>> ogdf.provenance(algorithm="FMMMLayout", unit_edge_length=20.0)
-{'seed': 42, 'package_version': '0.5.1', 'ogdf_version': '2025.10',
+{'seed': 42, 'package_version': '0.6.0', 'ogdf_version': '2025.10',
  'ogdf_tag': 'foxglove-202510', 'platform': '...', 'machine': 'x86_64',
  'python_version': '3.13.11',
  'settings': {'algorithm': 'FMMMLayout', 'unit_edge_length': 20.0}}
@@ -271,9 +271,9 @@ per directed edge and sets `attributes.directed`; a multigraph produces one edge
 per parallel edge, so counts are preserved. `label_attribute` copies a NetworkX
 node attribute into the node labels (`"__node__"` uses the node object itself).
 
-Going the other way, `to_networkx` picks a lossless class by default - directed
-when the attributes say so, a multigraph when the graph has parallel edges or
-self-loops - and copies the layout back:
+Going the other way, `to_networkx` returns an undirected graph unless you pass
+`directed=True`, a multigraph when the graph has parallel edges or self-loops,
+and copies the layout back:
 
 ```python
 h = ogdf.to_networkx(g, ga)
