@@ -51,7 +51,7 @@ IDs refer to findings in `REVIEW.md`.
 - [x] B7: Re-fetch OGDF when `ogdf-tag.txt` changes.
 - [ ] B8: Pin GitHub Actions by SHA.
 - [x] B9: Test Python 3.10 and 3.14, and macOS, on pushes to main.
-- [x] B10: Remove or restrict `make publish` / `make publish-test`.
+- [x] B10: `make publish` / `make publish-test` kept as is (decision: owner wants local twine uploads).
 - [x] T1 (part): `make_connected`, `make_biconnected`, `make_acyclic`, `is_triconnected` are tested.
 - [ ] T1 (rest): the other 44 untested exports.
 - [ ] T2: Tests for layout setters with a measurable effect.

@@ -20,8 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Wheels no longer contain the C++ binding sources (about 130 KB), and the sdist no longer contains `.github/` or `TODO.md`. PyPI shows repository, documentation, changelog and issue links, and the keywords describe the package.
 
-- `make publish` and `make publish-test` are removed: a local wheel is tagged for the build machine (`macosx_26_0_arm64`, or an unrepaired `linux_x86_64` that PyPI rejects). Publishing goes through `build-publish.yml`.
-
 - `shortest_paths` raises `PreconditionError` when it would use Bellman-Ford with `directed=False`, the default. `algorithm="auto"` picks Bellman-Ford when an `EdgeArrayInt` holds a negative length, and it used to switch to directed semantics silently: on `a->b, c->b` with one negative length, `c` went from distance 2 to unreachable. Pass `directed=True`.
 
 - `SpringEmbedderKK`, `StressMinimization` and `PivotMDS` count as layouts. `layout(g, "SpringEmbedderKK")` raised "unknown layout", and `about()` reported 19 layouts and 27 types instead of 22 and 24. Layouts are now the classes with a `call` method rather than those named `*Layout`.

@@ -4,7 +4,7 @@
 # This Makefile wraps common build commands for convenience.
 # The actual build is handled by scikit-build-core via pyproject.toml
 
-.PHONY: all bootstrap sync build rebuild test demos lint lint-check format format-check         typecheck qa clean distclean wheel sdist dist check upgrade coverage coverage-html docs docs-serve docs-deploy release help
+.PHONY: all bootstrap sync build rebuild test demos lint lint-check format format-check         typecheck qa clean distclean wheel sdist dist check publish-test         publish upgrade coverage coverage-html docs docs-serve docs-deploy release help
 
 # Prebuilt OGDF static library; its presence marks a completed bootstrap. MSVC
 # builds name it OGDF.lib and put it under the multi-config Release/ dir.
@@ -84,6 +84,14 @@ check:
 # Build both wheel and sdist
 dist: wheel sdist check
 
+# Publish to TestPyPI
+publish-test: check
+	@uv run twine upload --repository testpypi dist/*
+
+# Publish to PyPI
+publish: check
+	@uv run twine upload dist/*
+
 # Upgrade all dependencies
 upgrade:
 	@uv lock --upgrade
@@ -151,6 +159,8 @@ help:
 	@echo "  sdist        - Build source distribution"
 	@echo "  dist         - Build both wheel and sdist"
 	@echo "  check        - Check distributions with twine"
+	@echo "  publish-test - Publish to TestPyPI"
+	@echo "  publish      - Publish to PyPI"
 	@echo "  upgrade      - Upgrade all dependencies"
 	@echo "  coverage     - Run tests with coverage"
 	@echo "  coverage-html- Generate HTML coverage report"
