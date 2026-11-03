@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Wheels are built for the instruction-set baseline (`-march=x86-64` / `-march=armv8-a`). OGDF's CMake defaults to `-march=native` on GCC and Clang, so 0.5.1 and 0.6.0 wheels contain instructions of the CI runner that built them: the 0.6.0 manylinux and macOS x86_64 wheels use AVX2 and FMA, and the manylinux aarch64 wheel uses SVE. They can crash with an illegal instruction on CPUs without those extensions, which includes most aarch64 machines without SVE (for example AWS Graviton2 and Raspberry Pi). macOS arm64 and Windows wheels were not affected. The same default made a CI cache built on one runner crash another. `OGDF_ARCH=native` restores the old behaviour for local builds.
+
 - `validate("TreeLayout", g)`, and so `layout(g, TreeLayout)`, rejected undirected forests such as `0->1, 2->1` that `TreeLayout` draws. The `"forest"` property tested for rooted forests; it now tests for an undirected cycle, matching the binding. `graph_report()["forest"]` changes with it.
 
 - `layout(seed=...)` and `compare_layouts(seed=...)` now update `provenance()["seed"]`; they seeded the engine without recording it.

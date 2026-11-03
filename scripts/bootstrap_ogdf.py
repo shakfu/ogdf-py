@@ -28,12 +28,15 @@ Environment overrides:
     OGDF_ARCHIVE    path to a local OGDF source archive (.zip/.tar.gz/.tar.bz2)
     OGDF_SOURCE_DIR path to an existing OGDF source tree to copy from
     OGDF_OFFLINE    set to 1 to forbid network access (no clone)
+    OGDF_ARCH       -march value for GCC/Clang (default: the ISA baseline,
+                    x86-64 or armv8-a; "native" tunes for the build machine)
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -118,6 +121,26 @@ def source_is_current(tag: str) -> bool:
 
 def write_stamp(kind: str, detail: str) -> None:
     STAMP.write_text(f"{kind} {detail}\n", encoding="utf-8")
+
+
+def target_arch() -> str | None:
+    """The -march value to build OGDF for, or None to leave OGDF's choice.
+
+    OGDF defaults to -march=native on GCC/Clang outside ^arm processors, so a
+    library built on a CI runner can use instructions an older CPU lacks: a
+    cached build crashed another runner with SIGILL, and wheels would crash
+    users' machines the same way. Default to the ISA baseline instead.
+    """
+    if "OGDF_ARCH" in os.environ:
+        return os.environ["OGDF_ARCH"]
+    if os.name == "nt":
+        return None  # MSVC ignores OGDF_ARCH
+    machine = platform.machine().lower()
+    if machine in ("x86_64", "amd64"):
+        return "x86-64"
+    if machine in ("aarch64", "arm64"):
+        return "armv8-a"
+    return None
 
 
 def run(cmd: list[str]) -> None:
@@ -347,21 +370,26 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     # --- configure + build (library targets only; PIC for shared linking) --- #
-    print("==> Configuring OGDF (Release, library targets only)")
+    arch = target_arch()
+    print(
+        "==> Configuring OGDF (Release, library targets only"
+        + (f", -march={arch})" if arch else ")")
+    )
+    configure = [
+        "cmake",
+        "-S",
+        str(SRC),
+        "-B",
+        str(BUILD),
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DOGDF_LIBRARY_TARGETS_ONLY=ON",
+        "-DOGDF_WARNING_ERRORS=OFF",
+        "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+    ]
+    if arch:
+        configure.append(f"-DOGDF_ARCH={arch}")
     try:
-        run(
-            [
-                "cmake",
-                "-S",
-                str(SRC),
-                "-B",
-                str(BUILD),
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DOGDF_LIBRARY_TARGETS_ONLY=ON",
-                "-DOGDF_WARNING_ERRORS=OFF",
-                "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
-            ]
-        )
+        run(configure)
     except subprocess.CalledProcessError as exc:
         fail(
             f"CMake configuration of OGDF failed (exit {exc.returncode})",

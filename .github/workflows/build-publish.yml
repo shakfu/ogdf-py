@@ -132,6 +132,29 @@ jobs:
         env:
           CIBW_ARCHS: ${{ matrix.arch }}
 
+      # Built for the ISA baseline, a wheel must not use AVX on x86_64 or SVE
+      # on aarch64: those crash CPUs without them (see the 0.6.1 changelog).
+      - name: Check instruction set
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          case "${{ matrix.arch }}" in
+            x86_64) pattern='%?[xyz]mm(1[6-9]|2[0-9]|3[01])|%?[yz]mm[0-9]+' ;;
+            aarch64) pattern='[[:space:],{]z[0-9]+\.[bhsdq]' ;;
+            *) echo "no check for ${{ matrix.arch }}"; exit 0 ;;
+          esac
+          status=0
+          for whl in wheelhouse/*.whl; do
+            dir=$(mktemp -d)
+            unzip -q "$whl" 'ogdf/_core*' -d "$dir"
+            for so in "$dir"/ogdf/_core*.so; do
+              count=$(objdump -d --no-show-raw-insn "$so" | grep -cE "$pattern" || true)
+              echo "$(basename "$whl"): $count non-baseline instructions"
+              [ "$count" -eq 0 ] || status=1
+            done
+          done
+          exit $status
+
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
