@@ -134,12 +134,14 @@ jobs:
 
       # Built for the ISA baseline, a wheel must not use AVX on x86_64 or SVE
       # on aarch64: those crash CPUs without them (see the 0.6.1 changelog).
+      # x86_64 counts ymm/zmm only: objdump decodes inline Mach-O jump tables
+      # as EVEX instructions on xmm16-31.
       - name: Check instruction set
         if: runner.os != 'Windows'
         shell: bash
         run: |
           case "${{ matrix.arch }}" in
-            x86_64) pattern='%?[xyz]mm(1[6-9]|2[0-9]|3[01])|%?[yz]mm[0-9]+' ;;
+            x86_64) pattern='%[yz]mm[0-9]+' ;;
             aarch64) pattern='[[:space:],{]z[0-9]+\.[bhsdq]' ;;
             *) echo "no check for ${{ matrix.arch }}"; exit 0 ;;
           esac
@@ -148,9 +150,12 @@ jobs:
             dir=$(mktemp -d)
             unzip -q "$whl" 'ogdf/_core*' -d "$dir"
             for so in "$dir"/ogdf/_core*.so; do
-              count=$(objdump -d --no-show-raw-insn "$so" | grep -cE "$pattern" || true)
+              objdump -d --no-show-raw-insn "$so" > "$dir/asm.txt"
+              count=$(grep -cE "$pattern" "$dir/asm.txt" || true)
               echo "$(basename "$whl"): $count non-baseline instructions"
-              [ "$count" -eq 0 ] || status=1
+              [ "$count" -eq 0 ] && continue
+              grep -nE "$pattern" "$dir/asm.txt" | head -5
+              status=1
             done
           done
           exit $status
