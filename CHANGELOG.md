@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Pushing a release tag now creates the GitHub release, with all wheels, the sdist, and the matching CHANGELOG section as notes. It runs after the PyPI upload succeeds. The README now gives `pip install ogdf-py`.
+- Pushing a release tag now creates the GitHub release, with all wheels, the sdist, and the matching CHANGELOG section as notes. Tag pushes no longer publish to TestPyPI or PyPI; a manual run of `build-publish.yml` does, with the `testpypi` and `pypi` inputs (both off by default). The README now gives `pip install ogdf-py`.
 
 - The project is now licensed under the GPL, version 2 or 3, with the same linking exception for COIN-OR and Tulip that OGDF grants; it was MIT. Every wheel statically links OGDF, which is GPL v2/v3, so the wheels were never distributable as MIT-only. `pyproject.toml` declares `GPL-2.0-only OR GPL-3.0-only`. Released versions keep their MIT licence.
 
