@@ -57,7 +57,7 @@ env:
   # I/O, interop, recipes) against the built wheel rather than the source tree.
   CIBW_TEST_COMMAND: >-
     python -c "import ogdf; print(ogdf.about_text())" &&
-    pytest {project}/tests -v
+    pytest {project}/tests -v -o faulthandler_timeout=300
 
 jobs:
   build-sdist:
@@ -92,6 +92,8 @@ jobs:
   build-wheels:
     name: Wheels (${{ matrix.os }} / ${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
+    # A hung test would otherwise hold the runner for 6 hours.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:

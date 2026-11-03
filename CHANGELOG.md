@@ -46,7 +46,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - `docs/coverage.md` no longer lists packing and connectivity augmentation as excluded while marking them bound, or lists three items twice. Snippets in `docs/getting-started.md` and `docs/metrics.md` run top to bottom.
 
-- `fit_to_box` rejects NaN and infinite sizes and margins. An infinite width passed the positivity check and left every coordinate at `+-1.8e308`.
+- `fit_to_box` rejects NaN and infinite sizes and margins.
+
+- `PivotMDS` and `StressMinimization` compute 2D layouts even when the `GraphAttributes` has the `threeD` flag, which `ALL_ATTRIBUTES` and `layout()` set. The bindings expose only `x` and `y`. For a graph whose distances fit in a plane, such as a triangle, the third eigenvalue is 0, and OGDF's unbounded power iteration in `PivotMDS` never converged under MSVC: the Windows test run hung.
+
+- CI jobs time out after 30 minutes (wheel jobs after 60) instead of GitHub's 6 hours, and pytest dumps the stack of a test stuck for 5 minutes. An infinite width passed the positivity check and left every coordinate at `+-1.8e308`.
 
 ## [0.6.0]
 

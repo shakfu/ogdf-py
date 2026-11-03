@@ -18,6 +18,8 @@ jobs:
   qa:
     name: QA (lint, typecheck, test)
     runs-on: ubuntu-latest
+    # A hung test would otherwise hold the runner for 6 hours.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -53,7 +55,7 @@ jobs:
         run: uv run mypy src/ogdf tests/ scripts/
 
       - name: Run tests
-        run: uv run pytest tests/ -v --cov=src/ogdf --cov-report=xml
+        run: uv run pytest tests/ -v -o faulthandler_timeout=300 --cov=src/ogdf --cov-report=xml
 
   # The QA job covers Linux on 3.13. Test the oldest and newest supported
   # Pythons on Linux and macOS, so a platform- or version-specific failure
@@ -61,6 +63,8 @@ jobs:
   test-matrix:
     name: Test (${{ matrix.os }} / Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
+    # A hung test would otherwise hold the runner for 6 hours.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -90,13 +94,15 @@ jobs:
         run: uv sync --dev --python ${{ matrix.python }}
 
       - name: Run tests
-        run: uv run --python ${{ matrix.python }} pytest tests/ -q
+        run: uv run --python ${{ matrix.python }} pytest tests/ -q -o faulthandler_timeout=300
 
   # --strict turns broken links and nav entries into errors, which otherwise
   # surface only at `make docs-deploy`.
   docs:
     name: Docs (mkdocs --strict)
     runs-on: ubuntu-latest
+    # A hung test would otherwise hold the runner for 6 hours.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -130,6 +136,8 @@ jobs:
   offline-build:
     name: Offline source build
     runs-on: ubuntu-latest
+    # A hung test would otherwise hold the runner for 6 hours.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -176,6 +184,8 @@ jobs:
   windows:
     name: Build & test (Windows)
     runs-on: windows-latest
+    # A hung test would otherwise hold the runner for 6 hours.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -202,7 +212,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
-        run: uv run pytest tests/ -v
+        run: uv run pytest tests/ -v -o faulthandler_timeout=300
 
       - name: Installation report
         run: uv run python -m ogdf

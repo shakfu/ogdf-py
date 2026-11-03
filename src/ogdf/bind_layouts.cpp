@@ -221,8 +221,17 @@ void register_layouts(nb::module_& m) {
              [](CircularLayout& c, double x) { c.minDistSibling(x); },
              "value"_a);
 
+    // The bindings expose x and y only. Under ALL_ATTRIBUTES (threeD set)
+    // PivotMDS, and StressMinimization's PivotMDS start, otherwise compute a
+    // third eigenvector; when the distances fit in a plane (a triangle) its
+    // eigenvalue is 0 and the unbounded power iteration in
+    // PivotMDS::eigenValueDecomposition never converged under MSVC.
     nb::class_<StressMinimization>(m, "StressMinimization")
-        .def(nb::init<>())
+        .def("__init__",
+             [](StressMinimization* s) {
+                 new (s) StressMinimization();
+                 s->setForcing2DLayout(true);
+             })
         .def("call",
              [](StressMinimization& s, GraphAttributes& g) {
                  ogdfpy::require_graphics(g, "StressMinimization");
@@ -245,7 +254,11 @@ void register_layouts(nb::module_& m) {
              "value"_a);
 
     nb::class_<PivotMDS>(m, "PivotMDS")
-        .def(nb::init<>())
+        .def("__init__",
+             [](PivotMDS* p) {
+                 new (p) PivotMDS();
+                 p->setForcing2DLayout(true);
+             })
         .def("call",
              [](PivotMDS& p, GraphAttributes& g) {
                  ogdfpy::require_graphics(g, "PivotMDS");
