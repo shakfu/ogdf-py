@@ -49,8 +49,8 @@ def test_installation_report_capability_counts_are_current():
 
 def test_layout_count_claimed_in_the_selection_guide():
     text = _read("choosing-a-layout.md")
-    assert "nineteen layouts" in text
-    assert len(ogdf.about()["capability_names"]["layouts"]) == 19
+    assert "twenty-two layouts" in text
+    assert len(ogdf.about()["capability_names"]["layouts"]) == 22
 
 
 def test_drawing_metrics_example_matches_reality():

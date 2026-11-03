@@ -76,7 +76,7 @@ def test_bellman_ford_handles_negative_lengths():
     g, m = ogdf.from_edges([("a", "b"), ("b", "c"), ("a", "c")])
     length = ogdf.EdgeArrayInt(g, 0)
     ogdf.fill_edge_array(length, [2, -1, 5], g)
-    paths = ogdf.shortest_paths(g, m["a"], length)
+    paths = ogdf.shortest_paths(g, m["a"], length, directed=True)
     assert paths.algorithm == "bellman_ford"  # chosen automatically
     assert paths.distance(m["c"]) == 1.0
     assert paths.nodes_to(m["c"]) == [m["a"], m["b"], m["c"]]
@@ -94,7 +94,7 @@ def test_negative_cycle_raises_rather_than_returning_nonsense():
     g, m = ogdf.from_edges([("a", "b"), ("b", "a")])
     length = ogdf.EdgeArrayInt(g, -1)
     with pytest.raises(ogdf.AlgorithmError, match="negative cycle"):
-        ogdf.shortest_paths(g, m["a"], length, algorithm="bellman_ford")
+        ogdf.shortest_paths(g, m["a"], length, directed=True, algorithm="bellman_ford")
 
 
 def test_bellman_ford_rejects_float_weights_with_an_explanation():

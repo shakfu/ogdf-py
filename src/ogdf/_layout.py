@@ -27,6 +27,7 @@ from typing import Any
 
 from ogdf import _core
 from ogdf._about import _capabilities
+from ogdf._random import set_seed
 from ogdf._transforms import fit_to_box, normalize as _normalize, pack_components
 
 __all__ = ["layout", "layout_names"]
@@ -184,7 +185,7 @@ def layout(
     if attributes is None:
         attributes = _core.GraphAttributes(graph, _core.ALL_ATTRIBUTES)
     if seed is not None:
-        _core.seed_random_engine(int(seed))
+        set_seed(seed)
 
     instance.call(attributes)
 

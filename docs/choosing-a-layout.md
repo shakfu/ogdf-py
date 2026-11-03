@@ -1,6 +1,6 @@
 # Choosing a Layout
 
-The package exposes nineteen layouts. Which one to use is decided almost
+The package exposes twenty-two layouts. Which one to use is decided almost
 entirely by the *structure* of your graph, because most of them refuse - or
 quietly mislead - on input they were not designed for. Start from the structure,
 then narrow by scale and by what the drawing is for.
@@ -84,7 +84,7 @@ for row in ogdf.compare_layouts(g, {
     "sugiyama": ogdf.SugiyamaLayout,
     "fmmm": ogdf.FMMMLayout,
     "stress": ogdf.StressMinimization,
-    "planar": ogdf.SchnyderLayout,      # will be rejected: not planar
+    "planar": ogdf.SchnyderLayout,      # rejected: neither simple nor planar
 }, seed=1):
     if "error" in row:
         print(f"{row['layout']:10} n/a - {row['error']}")

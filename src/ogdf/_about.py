@@ -22,8 +22,8 @@ def _capabilities() -> dict[str, list[str]]:
 
     Classification is by shape rather than a hand-maintained list, so a newly
     bound layout or generator shows up in `about()` without a second edit:
-    layouts are classes whose name ends in "Layout"/"Mixer", other classes are
-    types, and the remaining callables are grouped by their I/O prefixes.
+    layouts are classes with a `call` method (SpringEmbedderKK, PivotMDS and
+    StressMinimization do not end in "Layout"), other classes are types, and the remaining callables are grouped by their I/O prefixes.
     """
     layouts: list[str] = []
     types: list[str] = []
@@ -34,7 +34,7 @@ def _capabilities() -> dict[str, list[str]]:
             continue
         obj = getattr(_core, name)
         if isinstance(obj, type):
-            if name.endswith(("Layout", "Mixer")):
+            if hasattr(obj, "call"):
                 layouts.append(name)
             else:
                 types.append(name)

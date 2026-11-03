@@ -29,50 +29,51 @@ IDs refer to findings in `REVIEW.md`.
 ## Medium
 
 - [x] Handle tracking overhead. Now within noise of HEAD built locally: `random_graph` with 1.2M elements 0.16 s, 200k `NodeArray` writes 7 ms, peak RSS +12 MB.
-- [ ] C17 depends on `HandleTracker` (`errors.h`): any call that adds or deletes elements calls into nanobind, so such calls must keep the GIL.
 - [ ] Hidden edges (`HiddenEdgeSet`) are not in `Graph::edges` when a graph is destroyed, so their Python handles are not invalidated. No binding hides edges on a user graph today.
 - [ ] A stale handle fails with nanobind's generic "incompatible function arguments" `TypeError`. A clearer message would need a check per access, which is what the tracker avoids.
 - [ ] T4: `tests/test_safety.py` covers each critical class in-process, so a regression to a segfault aborts the whole run. Run them in subprocesses to report each crash separately.
-- [ ] P4: `SpringEmbedderKK`, `StressMinimization`, `PivotMDS` are classified as layouts.
-- [ ] P5: The `"forest"` predicate matches what `TreeLayout` accepts.
-- [ ] P6: `shortest_paths` rejects Bellman-Ford with `directed=False`.
-- [ ] P7: `layout(seed=)` and `compare_layouts(seed=)` update `provenance()`.
+- [x] P4: `SpringEmbedderKK`, `StressMinimization`, `PivotMDS` are classified as layouts.
+- [x] P5: The `"forest"` predicate matches what `TreeLayout` accepts.
+- [x] P6: `shortest_paths` rejects Bellman-Ford with `directed=False`.
+- [x] P7: `layout(seed=)` and `compare_layouts(seed=)` update `provenance()`.
 - [ ] P8: `seeded()` does not replay the outer random stream on exit.
-- [ ] P9: `fill_node_array` with `keys` skips unmapped nodes.
-- [ ] P10: `fit_to_box` rejects non-finite sizes.
+- [x] P9: `fill_node_array` with `keys` skips unmapped nodes.
+- [x] P10: `fit_to_box` rejects non-finite sizes.
 - [ ] P11: Dijkstra results do not treat `2**31-1` as the unreachable sentinel.
-- [ ] C15: `separation_pair` handles non-biconnected input.
-- [ ] C16: Translate `ogdf::Exception` and `MatchingBlossomV` errors into `OGDFError` subclasses.
-- [ ] C17: Release the GIL in layout and algorithm calls without Python callbacks.
-- [ ] C18: Foreign source/target nodes and `new_edge` across graphs are rejected.
-- [ ] B3: Exclude C++ sources from the wheel.
-- [ ] B4: Pin OGDF by commit SHA and verify it after clone.
-- [ ] B5: Fix or remove the Linux OGDF cache in `build-publish.yml`.
-- [ ] B6: Add deployment target and runner image to OGDF cache keys.
-- [ ] B7: Re-fetch OGDF when `ogdf-tag.txt` changes.
+- [x] C15: `separation_pair` handles non-biconnected input.
+- [x] C16: Translate `ogdf::Exception` and `MatchingBlossomV` errors into `OGDFError` subclasses.
+- [ ] C17: Release the GIL in layout and algorithm calls without Python callbacks. Calls that add or delete elements must keep it: `HandleTracker` (`errors.h`) calls into nanobind from OGDF's observer callbacks.
+- [x] C18: Foreign source/target nodes and `new_edge` across graphs are rejected.
+- [x] B3: Exclude C++ sources from the wheel.
+- [x] B4: Pin OGDF by commit SHA and verify it after clone.
+- [x] B5: Fix or remove the Linux OGDF cache in `build-publish.yml`. Unverified until the next wheel run: the cache step should log "Cache saved" on Linux.
+- [ ] B6: Add the runner image to OGDF cache keys (the wheel keys now include the cibuildwheel version and deployment target).
+- [x] B7: Re-fetch OGDF when `ogdf-tag.txt` changes.
 - [ ] B8: Pin GitHub Actions by SHA.
-- [ ] B9: Test Python 3.10 and 3.14, and macOS, on pushes to main.
-- [ ] B10: Remove or restrict `make publish` / `make publish-test`.
-- [ ] T1: Tests for the 48 untested exports, starting with `make_connected`, `make_biconnected`, `make_acyclic`, `is_triconnected`.
+- [x] B9: Test Python 3.10 and 3.14, and macOS, on pushes to main.
+- [x] B10: Remove or restrict `make publish` / `make publish-test`.
+- [x] T1 (part): `make_connected`, `make_biconnected`, `make_acyclic`, `is_triconnected` are tested.
+- [ ] T1 (rest): the other 44 untested exports.
 - [ ] T2: Tests for layout setters with a measurable effect.
 - [ ] T3: Strengthen the TikZ, bends and I/O round-trip tests.
-- [ ] T5: Resolve the packing and augmentation contradictions in `docs/coverage.md`.
+- [x] T5: Resolve the packing and augmentation contradictions in `docs/coverage.md`.
 
 ## Low
 
-- [ ] `tarfile.extractall` uses `filter="data"`.
-- [ ] `pyproject.toml`: SPDX licence string, real keywords, `[project.urls]`, bounded build requirements.
-- [ ] Exclude `.github/`, `TODO.md`, `docs/`, `demos/` from the sdist.
-- [ ] `make qa` runs the same mypy scope as CI.
-- [ ] `distclean` removes what its help text says.
-- [ ] `OGDF_LIB` in the Makefile matches the Windows library name.
-- [ ] ruff and mypy cover `scripts/` and `demos/`.
-- [ ] CI runs `mkdocs build --strict`.
-- [ ] Decide whether `publish-pypi` should depend on `publish-testpypi`.
-- [ ] Remove dead `require_node`; validate `Color` components and names; check `to_svg`/`to_tikz` results; reject unknown `GraphAttributes` flag bits.
+- [x] `tarfile.extractall` uses `filter="data"`.
+- [x] `pyproject.toml`: SPDX licence string, real keywords, `[project.urls]`, bounded build requirements.
+- [x] Exclude `.github/` and `TODO.md` from the sdist. `docs/` and `demos/` stay: `tests/test_docs.py` reads `docs/`.
+- [x] `make qa` runs the same mypy scope as CI.
+- [x] `distclean` removes what its help text says.
+- [x] `OGDF_LIB` in the Makefile matches the Windows library name.
+- [x] ruff and mypy cover `scripts/`.
+- [ ] ruff and mypy cover `demos/`.
+- [x] CI runs `mkdocs build --strict`.
+- [x] Decide whether `publish-pypi` should depend on `publish-testpypi`: it runs after TestPyPI when both are selected.
+- [ ] (`require_node` is removed.) Validate `Color` components and names; check `to_svg`/`to_tikz` results; reject unknown `GraphAttributes` flag bits.
 - [ ] Unify `shortest_paths` / `min_st_cut` argument order, `directed` default and weight types.
 - [ ] `compare_layouts` ranking handles NaN stress; fix `aspect_ratio` docstring.
 - [ ] `from_networkx` overloads on `Literal`; warn when `label_attribute` is ignored; reject string edge pairs in `from_edges`.
 - [ ] Weak tests: facade default, setter test, generator postconditions, `extension_path`.
-- [ ] Docs: Schnyder rejection reason, standalone fragments, duplicate `coverage.md` items.
+- [x] Docs: Schnyder rejection reason, standalone fragments, duplicate `coverage.md` items.
 - [ ] Make `_random.py:93` reachable in tests.

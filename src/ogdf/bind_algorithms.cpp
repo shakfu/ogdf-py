@@ -743,6 +743,12 @@ void register_algorithms(nb::module_& m) {
                                          "maximum_weight_matching", "matching");
               ogdfpy::require_no_nan(weight, g, "maximum_weight_matching",
                                      "weight");
+              for (edge e : g.edges) {
+                  if (e->isSelfLoop()) {
+                      ogdfpy::unmet("maximum_weight_matching",
+                                    "a graph without self-loops");
+                  }
+              }
               std::unordered_set<edge> matched;
               MatchingBlossomV<double>().maximumWeightMatching(g, weight,
                                                                matched);
@@ -1023,6 +1029,9 @@ void register_algorithms(nb::module_& m) {
     // ---------------------------------------------------------------- //
     m.def("separation_pair",
           [](const Graph& g) -> nb::object {
+              // On a non-biconnected graph OGDF reports a cut vertex in s1 and
+              // leaves s2 null, which read as "triconnected".
+              ogdfpy::require_biconnected(g, "separation_pair");
               node s1 = nullptr;
               node s2 = nullptr;
               isTriconnected(g, s1, s2);
@@ -1036,7 +1045,8 @@ void register_algorithms(nb::module_& m) {
           "graph"_a,
           "Return one separation pair (2-cut) as (node, node) for a "
           "biconnected but not triconnected graph, or None if the graph is "
-          "triconnected.");
+          "triconnected. Raises InvalidGraphError if the graph is not "
+          "biconnected; use cut_vertices() for those.");
     m.def("spqr_tree_summary",
           [](const Graph& g) {
               ogdfpy::require_min_nodes(g, 3, "spqr_tree_summary");

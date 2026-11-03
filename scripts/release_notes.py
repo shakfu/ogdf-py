@@ -58,7 +58,9 @@ def strip_blank_edges(text: str) -> str:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Extract a CHANGELOG.md section into a release notes file.")
+    parser = argparse.ArgumentParser(
+        description="Extract a CHANGELOG.md section into a release notes file."
+    )
     parser.add_argument(
         "version",
         help='Release version, e.g. "0.1.2". The script first looks for '

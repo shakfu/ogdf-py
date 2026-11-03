@@ -86,7 +86,7 @@ report is printed by `python -m ogdf`:
 $ python -m ogdf
 ogdf-py installation report
 
-  package version    : 0.6.0
+  package version    : 0.6.1
   OGDF version       : 2025.10 (pinned tag: foxglove-202510)
   OGDF system        : Unix/linux
   OGDF LP solver     : COIN-OR LP (Clp)
@@ -98,7 +98,7 @@ ogdf-py installation report
   compiler           : GCC 13.3.0
   extension          : .../ogdf/_core.cpython-313-x86_64-linux-gnu.so
 
-  capabilities       : 19 layouts, 99 algorithms/generators, 19 I/O functions, 27 types
+  capabilities       : 22 layouts, 99 algorithms/generators, 19 I/O functions, 24 types
 ```
 
 Include this output in bug reports. `ogdf.about()` returns the same data as a
@@ -163,6 +163,7 @@ component = ogdf.NodeArrayInt(g)
 n = ogdf.connected_components(g, component)
 
 # Shortest paths from a source.
+source = next(g.nodes())
 weight = ogdf.EdgeArrayDouble(g, 1.0)
 dist = ogdf.NodeArrayDouble(g)
 ogdf.dijkstra(g, weight, source, dist)
@@ -211,7 +212,7 @@ against like conditions:
 ```python
 >>> ogdf.set_seed(42)
 >>> ogdf.provenance(algorithm="FMMMLayout", unit_edge_length=20.0)
-{'seed': 42, 'package_version': '0.6.0', 'ogdf_version': '2025.10',
+{'seed': 42, 'package_version': '0.6.1', 'ogdf_version': '2025.10',
  'ogdf_tag': 'foxglove-202510', 'platform': '...', 'machine': 'x86_64',
  'python_version': '3.13.11',
  'settings': {'algorithm': 'FMMMLayout', 'unit_edge_length': 20.0}}
@@ -294,7 +295,9 @@ mapping:
 weight = ogdf.EdgeArrayDouble(g, 1.0)
 ogdf.fill_edge_array(weight, {0: 2.5, 1: 0.5}, g)      # keyed by edge.index
 ogdf.edge_array_to_dict(weight, g)                     # back out again
-ogdf.node_array_to_list(dist, g)                       # in node iteration order
+degree = ogdf.NodeArrayInt(g)
+ogdf.fill_node_array(degree, [v.degree for v in g.nodes()], g)
+ogdf.node_array_to_list(degree, g)                     # in node iteration order
 ```
 
 `fill_node_array` / `fill_edge_array` accept either a mapping (nodes missing
@@ -322,6 +325,7 @@ calling in bulk.
 ### Shortest paths
 
 ```python
+source, *_, v = g.nodes()
 paths = ogdf.shortest_paths(g, source, weight)   # weight optional (unit edges)
 
 paths.distance(v)            # math.inf if unreachable, not a magic sentinel
@@ -330,13 +334,15 @@ paths.nodes_to(v)            # list of Node including both endpoints
 paths.predecessor_edge(v)    # the edge used to reach v
 paths.reachable(v)           # also: `v in paths`
 paths.unreachable_nodes()
-paths.distances(keys=keys)   # dict, keyed by node.index or your own keys
+paths.distances()            # dict keyed by node.index; keys= for your own
 ```
 
 `algorithm` defaults to `"auto"`: Dijkstra, unless `weight` is an
 `EdgeArrayInt` containing a negative length, in which case Bellman-Ford. Force
-either with `algorithm="dijkstra"` / `"bellman_ford"`. A reachable negative
-cycle raises `AlgorithmError` rather than returning meaningless distances.
+either with `algorithm="dijkstra"` / `"bellman_ford"`. Bellman-Ford honours
+edge direction only, so it needs `directed=True`; without it, a call that would
+pick Bellman-Ford raises `PreconditionError`. A reachable negative cycle raises
+`AlgorithmError` rather than returning meaningless distances.
 
 !!! note "Why Bellman-Ford takes integers"
     `dijkstra` and `a_star_search` take `EdgeArrayDouble`; `bellman_ford` takes
@@ -350,6 +356,7 @@ cycle raises `AlgorithmError` rather than returning meaningless distances.
 ### Cuts
 
 ```python
+source, *_, sink = g.nodes()
 cut = ogdf.min_st_cut(g, weight, source, sink)   # directed=True by default
 
 cut.value          # equals the max flow, by duality

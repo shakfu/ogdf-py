@@ -4,10 +4,15 @@
 # This Makefile wraps common build commands for convenience.
 # The actual build is handled by scikit-build-core via pyproject.toml
 
-.PHONY: all bootstrap sync build rebuild test demos lint lint-check format format-check         typecheck qa clean distclean wheel sdist dist check publish-test         publish upgrade coverage coverage-html docs docs-serve docs-deploy release help
+.PHONY: all bootstrap sync build rebuild test demos lint lint-check format format-check         typecheck qa clean distclean wheel sdist dist check upgrade coverage coverage-html docs docs-serve docs-deploy release help
 
-# Prebuilt OGDF static library; its presence marks a completed bootstrap.
+# Prebuilt OGDF static library; its presence marks a completed bootstrap. MSVC
+# builds name it OGDF.lib and put it under the multi-config Release/ dir.
+ifeq ($(OS),Windows_NT)
+OGDF_LIB := thirdparty/ogdf/build/Release/OGDF.lib
+else
 OGDF_LIB := thirdparty/ogdf/build/libOGDF.a
+endif
 
 # Default target
 all: build
@@ -43,23 +48,23 @@ demos:
 
 # Lint with ruff (applies fixes)
 lint:
-	@uv run ruff check --fix src/ tests/
+	@uv run ruff check --fix src/ tests/ scripts/
 
 # Lint with ruff (check only, no fixes)
 lint-check:
-	@uv run ruff check src/ tests/
+	@uv run ruff check src/ tests/ scripts/
 
 # Format with ruff
 format:
-	@uv run ruff format src/ tests/
+	@uv run ruff format src/ tests/ scripts/
 
 # Check formatting without modifying files
 format-check:
-	@uv run ruff format --check src/ tests/
+	@uv run ruff format --check src/ tests/ scripts/
 
-# Type check with mypy
+# Type check with mypy (same scope as CI)
 typecheck:
-	@uv run mypy src/ogdf
+	@uv run mypy src/ogdf tests/ scripts/
 
 # Run a full quality assurance check (non-mutating; mirrors CI)
 qa: lint-check format-check typecheck test
@@ -78,14 +83,6 @@ check:
 
 # Build both wheel and sdist
 dist: wheel sdist check
-
-# Publish to TestPyPI
-publish-test: check
-	@uv run twine upload --repository testpypi dist/*
-
-# Publish to PyPI
-publish: check
-	@uv run twine upload dist/*
 
 # Upgrade all dependencies
 upgrade:
@@ -130,9 +127,9 @@ clean:
 	@find src -name "*.pyd" -delete
 	@find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
-# Clean everything including CMake cache
+# Also remove the docs site and the OGDF checkout (the next build re-bootstraps)
 distclean: clean
-	@rm -rf CMakeCache.txt CMakeFiles/
+	@rm -rf site/ thirdparty/ogdf/
 
 # Show help
 help:
@@ -154,8 +151,6 @@ help:
 	@echo "  sdist        - Build source distribution"
 	@echo "  dist         - Build both wheel and sdist"
 	@echo "  check        - Check distributions with twine"
-	@echo "  publish-test - Publish to TestPyPI"
-	@echo "  publish      - Publish to PyPI"
 	@echo "  upgrade      - Upgrade all dependencies"
 	@echo "  coverage     - Run tests with coverage"
 	@echo "  coverage-html- Generate HTML coverage report"
@@ -164,5 +159,5 @@ help:
 	@echo "  docs-deploy  - Deploy the docs to GitHub Pages"
 	@echo "  release      - Bump version, tag, and prepare release"
 	@echo "  clean        - Remove build artifacts"
-	@echo "  distclean    - Remove all generated files"
+	@echo "  distclean    - clean, plus the docs site and the OGDF checkout"
 	@echo "  help         - Show this help message"

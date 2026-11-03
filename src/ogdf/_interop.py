@@ -202,11 +202,13 @@ def fill_edge_array(
 def _fill(array, values, elements, keys, default_key, what):
     elements = list(elements)
     if isinstance(values, Mapping):
-        key_of: Callable[[Any], Hashable] = (
-            default_key if keys is None else keys.__getitem__
-        )
         for element in elements:
-            key = key_of(element)
+            if keys is None:
+                key = default_key(element)
+            elif element in keys:
+                key = keys[element]
+            else:
+                continue  # unmapped: keep the array's current value
             if key in values:
                 array[element] = values[key]
         return array

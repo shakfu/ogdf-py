@@ -186,9 +186,9 @@ def shortest_paths(
       `EdgeArrayInt` containing a negative length.
     - `"dijkstra"` - exact, requires non-negative weights, honours `directed`.
     - `"bellman_ford"` - exact, admits negative lengths, requires an
-      `EdgeArrayInt`, and always treats edges as directed. Raises
-      `AlgorithmError` if a negative cycle is reachable, since no shortest path
-      is then defined.
+      `EdgeArrayInt` and `directed=True`, and raises `PreconditionError`
+      otherwise. Raises `AlgorithmError` if a negative cycle is reachable,
+      since no shortest path is then defined.
 
     >>> import ogdf
     >>> g, m = ogdf.from_edges([("a", "b"), ("b", "c")])
@@ -217,6 +217,12 @@ def shortest_paths(
                 "shortest_paths(algorithm='bellman_ford') needs an EdgeArrayInt; "
                 "OGDF's Bellman-Ford is defined over integer lengths. Use "
                 "algorithm='dijkstra' for float weights (non-negative only)."
+            )
+        if not directed:
+            raise _core.PreconditionError(
+                "shortest_paths: Bellman-Ford honours edge direction only; "
+                "pass directed=True. With negative lengths an undirected edge "
+                "is a negative cycle, so no undirected answer exists."
             )
         ok, distances, predecessors = _core.bellman_ford_tree(graph, source, weight)
         if not ok:

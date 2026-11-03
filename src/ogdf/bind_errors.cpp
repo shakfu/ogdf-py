@@ -17,6 +17,12 @@
 
 #include "errors.h"
 
+#include <nanobind/stl/string.h>
+
+#include <ogdf/basic/exceptions.h>
+
+#include <string>
+
 using namespace ogdfpy;
 
 void register_errors(nb::module_& m) {
@@ -34,5 +40,35 @@ void register_errors(nb::module_& m) {
     nb::exception<InvalidGraphError>(m, "InvalidGraphError", precondition);
     nb::exception<UnsupportedFormatError>(m, "UnsupportedFormatError",
                                           value_bases);
-    nb::exception<AlgorithmError>(m, "AlgorithmError", runtime_bases);
+    nb::object algorithm =
+        nb::exception<AlgorithmError>(m, "AlgorithmError", runtime_bases);
+
+    // ogdf::Exception derives privately from std::exception, so nanobind's
+    // std::exception fallback cannot catch it and the error would surface as
+    // an unknown C++ exception. Map OGDF's failures onto the taxonomy above.
+    static nb::handle algorithm_type = algorithm.release();
+    static nb::handle base_type = base.inc_ref();
+    nb::register_exception_translator(
+        [](const std::exception_ptr& p, void*) {
+            try {
+                std::rethrow_exception(p);
+            } catch (const ogdf::AlgorithmFailureException& e) {
+                const std::string msg =
+                    "OGDF algorithm failure (code " +
+                    std::to_string(static_cast<int>(e.exceptionCode())) + ")";
+                PyErr_SetString(algorithm_type.ptr(), msg.c_str());
+            } catch (const ogdf::Exception&) {
+                PyErr_SetString(base_type.ptr(), "OGDF raised an internal error");
+            }
+        });
+
+    // Test hook: lets the suite check the translator, since no bound call
+    // reliably makes OGDF throw.
+    m.def("_throw_for_test", [](const std::string& kind) {
+        if (kind == "algorithm") {
+            throw ogdf::AlgorithmFailureException(
+                ogdf::AlgorithmFailureCode::Unknown, __FILE__, __LINE__);
+        }
+        throw ogdf::DynamicCastFailedException(__FILE__, __LINE__);
+    });
 }

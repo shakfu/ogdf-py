@@ -45,7 +45,9 @@ _PROPERTIES: dict[str, tuple[str, Callable[[Any], bool]]] = {
         _core.represents_comb_embedding,
     ),
     "acyclic": ("acyclic when edges are read as directed", _core.is_acyclic),
-    "forest": ("a tree or forest", _core.is_forest),
+    # TreeLayout checks the undirected graph; is_forest tests for rooted
+    # (directed) forests and rejects inputs TreeLayout draws.
+    "forest": ("a tree or forest", _core.is_acyclic_undirected),
     "tree": ("a tree (connected and acyclic)", _core.is_tree),
     "bipartite": ("bipartite", _core.is_bipartite),
 }

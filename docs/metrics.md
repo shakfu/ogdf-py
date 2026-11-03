@@ -95,7 +95,7 @@ survives intact.
 ```python
 ogdf.normalize(ga)                    # lower-left corner to (0, 0)
 ogdf.center(ga, x=0, y=0)             # bounding box centred on a point
-ogdf.translate(ga, dx, dy)
+ogdf.translate(ga, 10, -5)
 ogdf.scale(ga, 2.0, about="center")   # or "origin", "min", or an (x, y) point
 ogdf.fit_to_box(ga, 800, 600, margin=20)
 ogdf.pack_components(ga, separation=30)

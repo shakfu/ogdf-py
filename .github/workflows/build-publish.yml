@@ -36,9 +36,15 @@ env:
   CIBW_SKIP: "*-musllinux_* pp*"
   # Clone + build OGDF once per platform before building any wheels. On Linux
   # this runs inside the manylinux container (git present; install cmake).
+  # cibuildwheel copies the checkout, including a cache-restored thirdparty/,
+  # into the container, but nothing comes back; copy the built tree to the
+  # host (mounted at /host) so the cache step can save it.
+  CIBW_ENVIRONMENT_PASS_LINUX: GITHUB_WORKSPACE
   CIBW_BEFORE_ALL_LINUX: >-
     (command -v cmake >/dev/null 2>&1 || pipx install cmake) &&
-    python3 scripts/bootstrap_ogdf.py
+    python3 scripts/bootstrap_ogdf.py &&
+    mkdir -p "/host${GITHUB_WORKSPACE}/thirdparty" &&
+    cp -a thirdparty/ogdf "/host${GITHUB_WORKSPACE}/thirdparty/"
   CIBW_BEFORE_ALL_MACOS: python3 scripts/bootstrap_ogdf.py
   # windows-latest ships git, CMake, and MSVC; the bootstrap builds OGDF with
   # the MSVC toolchain.
@@ -110,11 +116,14 @@ jobs:
       - uses: actions/checkout@v7
 
       # Cache the cloned+built OGDF per platform/arch so reruns skip the build.
+      # The cibuildwheel version selects the manylinux image (compiler, glibc)
+      # and the deployment target changes the compiled objects, so both are in
+      # the key.
       - name: Cache OGDF
         uses: actions/cache@v6
         with:
           path: thirdparty/ogdf
-          key: ogdf-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('scripts/bootstrap_ogdf.py', 'scripts/ogdf-tag.txt') }}
+          key: ogdf-wheel-${{ runner.os }}-${{ matrix.arch }}-cibw4.1.0-${{ matrix.macos_target }}-${{ hashFiles('scripts/bootstrap_ogdf.py', 'scripts/ogdf-tag.txt', 'scripts/ogdf-commit.txt') }}
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v4.1.0

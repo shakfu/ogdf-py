@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.1]
+
+### Security
+
+- The OGDF bootstrap verifies that the pinned tag resolves to the commit in `scripts/ogdf-commit.txt` and refuses the clone otherwise. A moved tag, or an `OGDF_REPO` pointing elsewhere, would have changed the code statically linked into published wheels without changing any cache key. An overridden `OGDF_TAG` is checked against the tag instead.
+
+- `--archive` / `OGDF_ARCHIVE` tarballs are extracted with the `data` filter, or an equivalent member check on interpreters without it. On Python 3.10-3.13 a crafted archive could write outside the extraction directory.
+
+### Changed
+
+- Build requirements are bounded at the next major version: `nanobind>=3.0,<4`, `scikit-build-core>=0.12.2,<2`. A new major could break sdist builds of an already released version. Builds were already resolving nanobind 3.1.0, so the floor matches what is tested.
+
+- Wheels no longer contain the C++ binding sources (about 130 KB), and the sdist no longer contains `.github/` or `TODO.md`. PyPI shows repository, documentation, changelog and issue links, and the keywords describe the package.
+
+- `make publish` and `make publish-test` are removed: a local wheel is tagged for the build machine (`macosx_26_0_arm64`, or an unrepaired `linux_x86_64` that PyPI rejects). Publishing goes through `build-publish.yml`.
+
+- `shortest_paths` raises `PreconditionError` when it would use Bellman-Ford with `directed=False`, the default. `algorithm="auto"` picks Bellman-Ford when an `EdgeArrayInt` holds a negative length, and it used to switch to directed semantics silently: on `a->b, c->b` with one negative length, `c` went from distance 2 to unreachable. Pass `directed=True`.
+
+- `SpringEmbedderKK`, `StressMinimization` and `PivotMDS` count as layouts. `layout(g, "SpringEmbedderKK")` raised "unknown layout", and `about()` reported 19 layouts and 27 types instead of 22 and 24. Layouts are now the classes with a `call` method rather than those named `*Layout`.
+
+### Fixed
+
+- `validate("TreeLayout", g)`, and so `layout(g, TreeLayout)`, rejected undirected forests such as `0->1, 2->1` that `TreeLayout` draws. The `"forest"` property tested for rooted forests; it now tests for an undirected cycle, matching the binding. `graph_report()["forest"]` changes with it.
+
+- `layout(seed=...)` and `compare_layouts(seed=...)` now update `provenance()["seed"]`; they seeded the engine without recording it.
+
+- `separation_pair` raises `InvalidGraphError` on a graph that is not biconnected. It returned `None`, which means "triconnected", for a path.
+
+- OGDF's own exceptions reach Python as `AlgorithmError` (for `AlgorithmFailureException`) or `OGDFError`. `ogdf::Exception` derives privately from `std::exception`, so nanobind's fallback could not catch it. `maximum_weight_matching` rejects self-loops with `InvalidGraphError`; Blossom V raised a bare `RuntimeError`.
+
+- `fill_node_array` / `fill_edge_array` with `keys` skip elements missing from `keys`, as documented; they raised `KeyError`.
+
+- The bootstrap re-fetches an OGDF checkout that no longer matches the pin, for example after a tag bump. It reused the old source and compiled the new tag into `ogdf.about()`, which then reported the wrong OGDF version. Sources supplied with `--archive` or `--source-dir` are used as they are.
+
+- `make typecheck` (and so `make qa`) covers the same paths as CI; ruff and mypy now also cover `scripts/`, which the release path runs. `make distclean` removes the docs site and the OGDF checkout, as its help says. `make build` on Windows no longer re-bootstraps every run (the library is `OGDF.lib` there).
+
+- CI builds the docs with `mkdocs build --strict`, and runs on Ubuntu and macOS with Python 3.10 and 3.14 in addition to Ubuntu with 3.13.
+
+- `docs/coverage.md` no longer lists packing and connectivity augmentation as excluded while marking them bound, or lists three items twice. Snippets in `docs/getting-started.md` and `docs/metrics.md` run top to bottom.
+
+- `fit_to_box` rejects NaN and infinite sizes and margins. An infinite width passed the positivity check and left every coordinate at `+-1.8e308`.
+
 ## [0.6.0]
 
 ### Added

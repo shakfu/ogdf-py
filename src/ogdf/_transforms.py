@@ -22,6 +22,7 @@ All of them mutate the `GraphAttributes` in place, matching how layouts behave.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from ogdf import _core
@@ -145,8 +146,12 @@ def fit_to_box(
     >>> round(x0, 6) >= 10 and round(x1, 6) <= 390
     True
     """
-    if width <= 0.0 or height <= 0.0:
-        raise _core.PreconditionError("fit_to_box: width and height must be positive")
+    if not (0.0 < width < math.inf and 0.0 < height < math.inf):
+        raise _core.PreconditionError(
+            "fit_to_box: width and height must be positive and finite"
+        )
+    if not math.isfinite(margin):
+        raise _core.PreconditionError("fit_to_box: margin must be finite")
     inner_width = width - 2.0 * margin
     inner_height = height - 2.0 * margin
     if inner_width <= 0.0 or inner_height <= 0.0:

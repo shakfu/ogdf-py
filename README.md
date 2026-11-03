@@ -88,7 +88,7 @@ The documentation site (`docs/`) includes a getting-started guide, a [coverage c
 
 ## How it builds
 
-`scripts/bootstrap_ogdf.py` shallow-clones OGDF at a pinned release tag (`foxglove-202510`) into `thirdparty/ogdf` and builds its static libraries from source. The extension then links the OGDF / COIN static libraries, so wheels are self-contained. Because OGDF is prebuilt once (a couple of minutes), rebuilding the bindings only recompiles the binding sources and is fast.
+`scripts/bootstrap_ogdf.py` shallow-clones OGDF at a pinned release tag (`foxglove-202510`) into `thirdparty/ogdf`, checks that it is the commit recorded in `scripts/ogdf-commit.txt`, and builds its static libraries from source. The extension then links the OGDF / COIN static libraries, so wheels are self-contained. Because OGDF is prebuilt once (a couple of minutes), rebuilding the bindings only recompiles the binding sources and is fast.
 
 The bootstrap script (`scripts/bootstrap_ogdf.py`) is cross-platform (Linux, macOS, Windows). The pin can be overridden: `python scripts/bootstrap_ogdf.py --tag <tag>` or `OGDF_TAG=<tag> make bootstrap`. In CI, run the bootstrap once per platform (e.g. in `cibuildwheel`'s `CIBW_BEFORE_ALL`) so OGDF is reused across all Python versions.
 

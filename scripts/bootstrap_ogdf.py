@@ -16,8 +16,14 @@ Usage:
                                      [--clone-only] [--archive PATH]
                                      [--source-dir PATH] [--offline]
 
+The pinned tag must resolve to the commit in ``scripts/ogdf-commit.txt``; a
+clone that does not is rejected, since a moved tag would change the code linked
+into published wheels. An existing checkout that no longer matches the pin
+(after a tag bump) is re-fetched.
+
 Environment overrides:
-    OGDF_TAG        git tag to clone (default: contents of scripts/ogdf-tag.txt)
+    OGDF_TAG        git tag to clone (default: contents of scripts/ogdf-tag.txt);
+                    the commit pin does not apply to an overridden tag
     OGDF_REPO       git remote to clone from
     OGDF_ARCHIVE    path to a local OGDF source archive (.zip/.tar.gz/.tar.bz2)
     OGDF_SOURCE_DIR path to an existing OGDF source tree to copy from
@@ -39,6 +45,10 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "thirdparty" / "ogdf"
 BUILD = SRC / "build"
 TAG_FILE = Path(__file__).resolve().parent / "ogdf-tag.txt"
+COMMIT_FILE = Path(__file__).resolve().parent / "ogdf-commit.txt"
+# Records where SRC came from: "clone <tag>", "archive <path>" or
+# "source-dir <path>".
+STAMP = SRC / ".ogdfpy-source"
 
 
 def pinned_tag() -> str:
@@ -57,7 +67,57 @@ def pinned_tag() -> str:
 
 
 DEFAULT_TAG = pinned_tag()
+
+
+def pinned_commit(tag: str) -> str | None:
+    """The commit `tag` must resolve to, or None for an overridden tag."""
+    try:
+        file_tag = TAG_FILE.read_text(encoding="utf-8").strip()
+        commit = COMMIT_FILE.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return commit if tag == file_tag else None
+
+
 OGDF_REPO = os.environ.get("OGDF_REPO", "https://github.com/ogdf/ogdf.git")
+
+
+def git_output(*args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(SRC), *args], capture_output=True, text=True, check=False
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def checkout_matches(tag: str) -> bool:
+    """True if the git checkout at SRC is the commit `tag` is pinned to."""
+    if shutil.which("git") is None or not (SRC / ".git").exists():
+        return False
+    head = git_output("rev-parse", "HEAD")
+    commit = pinned_commit(tag)
+    if commit is not None:
+        return head == commit
+    return tag in git_output("tag", "--points-at", "HEAD").split()
+
+
+def source_is_current(tag: str) -> bool:
+    """Whether the source already at SRC can be used for `tag`.
+
+    Sources supplied with --archive or --source-dir are the caller's choice and
+    are used as they are. A clone, or a checkout from before the stamp existed,
+    must match the pin.
+    """
+    try:
+        stamp = STAMP.read_text(encoding="utf-8").split()
+    except OSError:
+        stamp = []
+    if stamp and stamp[0] in ("archive", "source-dir"):
+        return True
+    return checkout_matches(tag)
+
+
+def write_stamp(kind: str, detail: str) -> None:
+    STAMP.write_text(f"{kind} {detail}\n", encoding="utf-8")
 
 
 def run(cmd: list[str]) -> None:
@@ -101,6 +161,44 @@ def _strip_single_root(extracted: Path, dest: Path) -> None:
     shutil.move(str(root), str(dest))
 
 
+def safe_extract(tf: tarfile.TarFile, dest: Path) -> None:
+    """Extract without letting a member write outside `dest`.
+
+    Uses the "data" filter where available (3.10.12+, 3.11.4+, 3.12+); older
+    interpreters get an equivalent check of each member's path and link target.
+    """
+    if hasattr(tarfile, "data_filter"):
+        try:
+            tf.extractall(dest, filter="data")
+        except tarfile.FilterError as exc:
+            fail(
+                f"unsafe archive member: {exc}",
+                "use an unmodified OGDF source archive.",
+            )
+        return
+    root = dest.resolve()
+    for member in tf.getmembers():
+        target = (root / member.name).resolve()
+        link = (
+            (target.parent / member.linkname).resolve()
+            if member.issym() or member.islnk()
+            else target
+        )
+        for path in (target, link):
+            if path != root and root not in path.parents:
+                fail(
+                    f"archive member {member.name!r} would be written outside "
+                    "the extraction directory",
+                    "use an unmodified OGDF source archive.",
+                )
+        if member.isdev():
+            fail(
+                f"archive member {member.name!r} is a device file",
+                "use an unmodified OGDF source archive.",
+            )
+    tf.extractall(dest)  # noqa: S202 - every member checked above
+
+
 def unpack_archive(archive: Path) -> None:
     """Populate `SRC` from a local source archive (no network needed)."""
     if not archive.exists():
@@ -111,22 +209,23 @@ def unpack_archive(archive: Path) -> None:
     staging.mkdir(parents=True)
     print(f"==> Unpacking {archive} into {SRC}")
     name = archive.name.lower()
-    if name.endswith(".zip"):
-        with zipfile.ZipFile(archive) as zf:
-            zf.extractall(staging)
-    elif name.endswith((".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".tar")):
-        with tarfile.open(archive) as tf:
-            tf.extractall(staging)
-    else:
-        shutil.rmtree(staging)
-        fail(
-            f"unsupported archive format: {archive.name}",
-            "use .zip, .tar.gz, .tar.bz2, .tar.xz, or .tar.",
-        )
     try:
+        if name.endswith(".zip"):
+            # zipfile.extractall already drops absolute and ".." components.
+            with zipfile.ZipFile(archive) as zf:
+                zf.extractall(staging)
+        elif name.endswith((".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".tar")):
+            with tarfile.open(archive) as tf:
+                safe_extract(tf, staging)
+        else:
+            fail(
+                f"unsupported archive format: {archive.name}",
+                "use .zip, .tar.gz, .tar.bz2, .tar.xz, or .tar.",
+            )
         _strip_single_root(staging, SRC)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
+    write_stamp("archive", str(archive))
 
 
 def copy_source_dir(source: Path) -> None:
@@ -140,9 +239,18 @@ def copy_source_dir(source: Path) -> None:
     if SRC.exists():
         shutil.rmtree(SRC)
     shutil.copytree(source, SRC, symlinks=True)
+    write_stamp("source-dir", str(source))
 
 
-def clone(tag: str, offline: bool) -> None:
+def clone(tag: str, offline: bool, stale: bool = False) -> None:
+    if offline and stale:
+        fail(
+            f"the OGDF checkout at {SRC} does not match OGDF @ {tag}, and network "
+            "access is disabled",
+            "re-fetch it with network access, or supply the matching source with "
+            "--archive PATH or --source-dir PATH (or OGDF_ARCHIVE / "
+            "OGDF_SOURCE_DIR).",
+        )
     if offline:
         fail(
             "OGDF source is missing and network access is disabled",
@@ -165,6 +273,17 @@ def clone(tag: str, offline: bool) -> None:
             "check network/proxy access to the remote, or vendor the source with "
             "--archive PATH / --source-dir PATH for an offline build.",
         )
+    if not checkout_matches(tag):
+        head = git_output("rev-parse", "HEAD")
+        expected = pinned_commit(tag) or f"a commit tagged {tag}"
+        shutil.rmtree(SRC, ignore_errors=True)
+        fail(
+            f"{OGDF_REPO} @ {tag} resolved to {head or 'an unknown commit'}, "
+            f"not the pinned {expected}",
+            "the tag was moved or the remote is not the official one. If the "
+            "change is intended, update scripts/ogdf-commit.txt.",
+        )
+    write_stamp("clone", tag)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -208,14 +327,20 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     # --- obtain the source: existing checkout, archive, copy, or clone --- #
-    if (SRC / "CMakeLists.txt").exists() and not args.force:
+    present = (SRC / "CMakeLists.txt").exists()
+    if present and not args.force and source_is_current(args.tag):
         print(f"==> OGDF source already present at {SRC} (use --force to re-fetch)")
+        if not STAMP.exists():
+            write_stamp("clone", args.tag)
     elif args.archive:
         unpack_archive(Path(args.archive).expanduser().resolve())
     elif args.source_dir:
         copy_source_dir(Path(args.source_dir).expanduser().resolve())
     else:
-        clone(args.tag, args.offline)
+        stale = present and not args.force
+        if stale and not args.offline:
+            print(f"==> {SRC} does not match OGDF @ {args.tag}; re-fetching")
+        clone(args.tag, args.offline, stale=stale)
 
     if args.clone_only:
         print("==> Source ready (--clone-only); skipping build.")

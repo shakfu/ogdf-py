@@ -1,6 +1,6 @@
 [project]
 name = "ogdf-py"
-version = "0.6.0"
+version = "0.6.1"
 description = "Python bindings for the Open Graph Drawing Framework (OGDF), built with nanobind."
 readme = "README.md"
 license = "GPL-2.0-only OR GPL-3.0-only"
@@ -9,7 +9,15 @@ authors = [
     { name = "Shakeeb Alireza", email = "shakfu@users.noreply.github.com" }
 ]
 requires-python = ">=3.10"
-keywords = ["nanobind", "python", "extension"]
+keywords = [
+    "graph",
+    "graph-drawing",
+    "graph-layout",
+    "graph-algorithms",
+    "planarity",
+    "ogdf",
+    "visualization",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
@@ -21,6 +29,12 @@ classifiers = [
     "Programming Language :: C++",
     "Typing :: Typed",
 ]
+
+[project.urls]
+Homepage = "https://github.com/shakfu/ogdf-py"
+Documentation = "https://shakfu.github.io/ogdf-py/"
+Changelog = "https://github.com/shakfu/ogdf-py/blob/main/CHANGELOG.md"
+Issues = "https://github.com/shakfu/ogdf-py/issues"
 
 [dependency-groups]
 dev = [
@@ -37,7 +51,9 @@ docs = [
 ]
 
 [build-system]
-requires = ["scikit-build-core>=0.12.2", "nanobind"]
+# Upper bounds at the next major: a new nanobind major can change the generated
+# stub or the C++ API and break sdist builds of an already released version.
+requires = ["scikit-build-core>=0.12.2,<2", "nanobind>=3.0,<4"]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
@@ -52,9 +68,10 @@ cmake.source-dir = "."
 # and wheel builds (which previously could drop recently-added functions from
 # the wheel).
 sdist.include = []
-sdist.exclude = []
-# Don't ship the C++ source inside the binary wheel.
-wheel.exclude = ["**/_core.cpp"]
+# Repository-only files. docs/ and demos/ stay: tests/test_docs.py reads docs/.
+sdist.exclude = [".github", "TODO.md", "REVIEW.md", "site"]
+# Don't ship the C++ sources inside the binary wheel.
+wheel.exclude = ["**/*.cpp", "**/*.h"]
 
 
 # networkx is an optional runtime dependency and ships no type stubs; the

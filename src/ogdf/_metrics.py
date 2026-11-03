@@ -28,6 +28,7 @@ import statistics
 from typing import Any, cast
 
 from ogdf import _core
+from ogdf._random import set_seed
 
 __all__ = ["compare_layouts", "drawing_metrics"]
 
@@ -138,7 +139,7 @@ def compare_layouts(
             if seed is None:
                 instance.call(attributes)
             else:
-                _core.seed_random_engine(seed)
+                set_seed(seed)
                 instance.call(attributes)
         except _core.OGDFError as exc:
             rows.append({"layout": name, "error": str(exc)})
