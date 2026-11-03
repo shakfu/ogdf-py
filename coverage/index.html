@@ -11,7 +11,7 @@
       
       
       
-        <link rel="prev" href="../getting-started/">
+        <link rel="prev" href="../metrics/">
       
       
         <link rel="next" href="../gallery/">
@@ -311,6 +311,87 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../choosing-a-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drawing Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -540,6 +621,122 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#python-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python layer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Python layer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#errors-and-preconditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors and preconditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interoperability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interoperability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reproducibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#placing-a-drawing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Placing a drawing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measuring-a-drawing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measuring a drawing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-yet-provided" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not yet provided
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#excluded-subsystems" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -608,9 +805,10 @@
 <h1 id="coverage">Coverage<a class="headerlink" href="#coverage" title="Permanent link">&para;</a></h1>
 <p>This page tracks what OGDF functionality is exposed by <code>ogdf-py</code>. It is a living checklist: <code>ogdf-py</code> is a <strong>curated subset</strong>, so most of OGDF is intentionally excluded.</p>
 <p><strong>Legend:</strong> <code>[x]</code> = bound and available in Python, <code>[ ]</code> = not (yet) bound. Unbound items scheduled for the next additions may be tagged <code>**(priority)**</code>; see the <a href="#priority-roadmap">Priority roadmap</a>.</p>
+<p>Most of this page tracks OGDF functionality. The <a href="#python-layer">Python layer</a> section at the end covers the parts of the API that are <em>not</em> a binding of anything - diagnostics, the exception taxonomy, interoperability, and reproducibility - which exist because a faithful binding alone is not a usable Python package.</p>
 <p><strong>Scope rationale.</strong> The binding targets OGDF's genuine differentiators for Python users - <strong>graph drawing</strong> and <strong>planarity</strong> - plus a <strong>core set of common graph algorithms</strong> (even where these overlap networkx/scipy) for a self-contained experience. Because that common-algorithm core is explicitly in scope, canonical routines users reach for next to what is already bound - notably <strong>A*</strong> (alongside <code>dijkstra</code>/<code>bellman_ford</code>) - are treated as in-scope gaps to close, not as exotic exclusions. That said, the core covers algorithms OGDF actually implements well: <strong>PageRank</strong> is intentionally omitted because OGDF only ships an undirected, [0, 1]-normalized variant that is degree-dominated and not the canonical directed measure (see below). Genuinely exotic or specialized algorithms, and large subsystems (clustering, UML, hypergraphs, cluster planarity, SEFE), are excluded unless there is concrete demand. Contributions that move an item from <code>[ ]</code> to <code>[x]</code> are welcome.</p>
 <h2 id="priority-roadmap">Priority roadmap<a class="headerlink" href="#priority-roadmap" title="Permanent link">&para;</a></h2>
-<p>Highest-value gaps given the drawing + planarity focus and the common-algorithm core. Tiers 1 and 2 are complete; nothing is currently scheduled. Future priorities, when chosen, are tagged <code>**(priority)**</code> in the sections below.</p>
+<p>Highest-value gaps given the drawing + planarity focus and the common-algorithm core. Tiers 1 through 3 are complete. Future priorities are tagged <code>**(priority)**</code> in the sections below.</p>
 <p><strong>Done (Tier 1):</strong></p>
 <ol>
 <li>
@@ -631,9 +829,46 @@
 <ol>
 <li><strong>Edge-insertion routing</strong> (<code>insert_edges</code>) - routes a chosen set of edges through the rest of the graph (which must be planar once they are removed) and returns, per edge, the original edges it crosses. Uses the variable-embedding inserter with no remove-reinsert, so crossings are attributed cleanly to the inserted edges rather than re-routed across the whole drawing.</li>
 </ol>
+<p><strong>Done (Tier 3 - ergonomics and operational trust):</strong></p>
+<ol>
+<li>
+<p><strong>Install confidence</strong> - <code>about()</code> / <code>python -m ogdf</code>, offline and prebuilt-OGDF build paths, a documented support matrix, and stage-specific build failures.</p>
+</li>
+<li>
+<p><strong>Errors and preconditions</strong> - an exception taxonomy (<code>OGDFError</code> and friends), enforcement of every documented precondition, and <code>validate()</code> / <code>graph_report()</code> helpers.</p>
+</li>
+<li>
+<p><strong>Python interoperability</strong> - NetworkX and edge-list conversion, array-to-container helpers, and results as ordinary Python collections.</p>
+</li>
+<li>
+<p><strong>Reproducibility</strong> - seeding for every stochastic operation, <code>provenance()</code> metadata, and achieved objective values from the heuristic layouts.</p>
+</li>
+</ol>
+<p><strong>Done (Tier 4 - results, placement, and measurement):</strong></p>
+<ol>
+<li>
+<p><strong>Result objects</strong> - <code>shortest_paths()</code> returns distances <em>and</em> the shortest-path tree that the array form discards, so paths, predecessors, and reachability are available without rebuilding them; <code>min_st_cut()</code> returns an <code>STCut</code> with named fields. The array-output functions are unchanged and remain the bulk-calling path. Every algorithm docstring now states its provenance (exact / heuristic / approximate), its directedness, its parallel-edge behaviour, and its unreachable sentinel.</p>
+<p>The node partition for <code>min_st_cut</code> was investigated and <strong>deliberately not exposed</strong>. OGDF's front and back cuts are the extreme minimum cuts nearest the source and nearest the sink; when the minimum cut is not unique they are different cuts, and neither reliably corresponds to the edge list returned alongside them. Callers who need the partition should derive it from the cut edges.</p>
+<p>The <code>int</code> / <code>double</code> split between <code>bellman_ford</code> and <code>dijkstra</code> is <strong>kept and documented</strong> rather than removed: OGDF's <code>ShortestPathModule</code> interface is defined over <code>int</code> and it ships no floating-point Bellman-Ford, so closing the gap would mean reimplementing the algorithm rather than binding one. The two are not interchangeable anyway - Dijkstra rejects the negative weights Bellman-Ford exists for. <code>shortest_paths()</code> accepts either array type and picks the engine.</p>
+</li>
+<li>
+<p><strong>Drawing quality metrics</strong> - <code>count_crossings</code>, <code>edge_lengths</code>, <code>bounding_box</code>, <code>node_overlaps</code>, <code>min_angle</code>, and <code>stress</code>, aggregated by <code>drawing_metrics()</code> and ranked by <code>compare_layouts()</code>. Computed over the drawn polylines, so edge bends count.</p>
+</li>
+<li>
+<p><strong>Coordinate transforms</strong> - <code>normalize</code>, <code>center</code>, <code>translate</code>, <code>scale</code>, <code>fit_to_box</code>, and <code>pack_components</code> (binding OGDF's <code>TileToRowsCCPacker</code>). All move edge bends as well as node coordinates, so routed drawings survive.</p>
+</li>
+<li>
+<p><strong>High-level <code>layout()</code> facade</strong> - one call from graph to placed drawing, composing preconditions, seeding, the layout, component packing, and fit-to-box. The algorithm is a class by default so it stays type-checked and completable; a string is accepted for config-driven use, and options are forwarded to the layout's setters by a mechanical <code>set_X</code> mapping that cannot drift from the bindings.</p>
+</li>
+</ol>
 <p><strong>Not scheduled:</strong></p>
 <ul>
-<li>Planarity depth: combinatorial embedding + dual graph, upward planarity testing, planar separators.</li>
+<li>
+<p>Planarity depth: combinatorial embedding + dual graph, upward planarity testing, planar separators.</p>
+</li>
+<li>
+<p>A high-level layout facade (<code>layout(graph, algorithm=...)</code> returning a result object). Worth doing only after item 10 settles the shape of a result, or it would be built twice.</p>
+</li>
 </ul>
 <h2 id="graph-model-and-attributes">Graph model and attributes<a class="headerlink" href="#graph-model-and-attributes" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
@@ -641,13 +876,22 @@
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>Graph</code>, <code>Node</code>, <code>Edge</code>, node/edge iteration</p>
 </li>
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>NodeArray</code> / <code>EdgeArray</code> (int, double, bool)</p>
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>NodeArray</code> / <code>EdgeArray</code> in three element types: <code>NodeArrayInt</code>, <code>NodeArrayDouble</code>, <code>NodeArrayBool</code>, <code>EdgeArrayInt</code>, <code>EdgeArrayDouble</code>, <code>EdgeArrayBool</code></p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>GraphAttributes</code>: coordinates, width/height, labels</p>
 </li>
 <li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>GraphAttributes.graph</code>, <code>.has(flags)</code> (is an attribute group enabled), <code>.directed</code></p>
+</li>
+<li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Styling: <code>Color</code>, <code>Shape</code>, <code>StrokeType</code>, <code>FillPattern</code>, <code>EdgeArrow</code></p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Attribute flags to enable groups of attributes: <code>NODE_GRAPHICS</code>, <code>EDGE_GRAPHICS</code>, <code>NODE_LABEL</code>, <code>EDGE_LABEL</code>, <code>NODE_STYLE</code>, <code>EDGE_STYLE</code>, <code>EDGE_ARROW</code>, <code>ALL_ATTRIBUTES</code></p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Layout configuration enums: <code>Orientation</code>, <code>RootSelection</code>, <code>RadialRootSelection</code>, <code>QualityVsSpeed</code></p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Node fill/stroke color, shape, fill pattern, stroke width</p>
@@ -659,22 +903,16 @@
 <p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 3D coordinates (<code>z</code>)</p>
 </li>
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>ClusterGraph</code> / <code>ClusterGraphAttributes</code></p>
-</li>
-<li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>GraphCopy</code> / <code>GraphReduction</code></p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Combinatorial embedding / dual graph</p>
 </li>
-<li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Hypergraphs</p>
-</li>
 </ul>
 <h2 id="layout-algorithms">Layout algorithms<a class="headerlink" href="#layout-algorithms" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>SugiyamaLayout</code> (layered / hierarchical)</p>
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>SugiyamaLayout</code> (layered / hierarchical), with <code>number_of_crossings()</code> / <code>number_of_levels()</code> from the last call</p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>FMMMLayout</code> (fast multipole multilevel, force-directed)</p>
@@ -692,7 +930,7 @@
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>PivotMDS</code></p>
 </li>
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>PlanarizationLayout</code> (with optional orthogonal routing via <code>OrthoLayout</code>)</p>
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>PlanarizationLayout</code> (with optional orthogonal routing via <code>OrthoLayout</code>), with <code>number_of_crossings()</code> from the last call</p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>SchnyderLayout</code> (planar straight-line grid)</p>
@@ -765,6 +1003,9 @@
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>is_two_edge_connected</code>, <code>is_regular</code>, <code>is_arborescence</code></p>
 </li>
 <li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Simplicity: <code>is_simple</code>, <code>is_simple_undirected</code>, <code>has_self_loops</code></p>
+</li>
+<li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> cut vertices (<code>cut_vertices</code>) and bridges (<code>bridges</code>)</p>
 </li>
 <li class="task-list-item">
@@ -786,7 +1027,7 @@
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>is_planar</code></p>
 </li>
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>planar_embed</code>, <code>planar_embed_planar_graph</code></p>
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>planar_embed</code>, <code>planar_embed_planar_graph</code>, <code>represents_comb_embedding</code> (is an embedding currently in place)</p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Maximal planar subgraph (<code>maximal_planar_subgraph</code>)</p>
@@ -807,13 +1048,16 @@
 <h3 id="shortest-paths">Shortest paths<a class="headerlink" href="#shortest-paths" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>dijkstra</code> (single-source, weighted)</p>
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>dijkstra</code> (single-source, weighted; array form) and <code>dijkstra_tree</code> (also returns the shortest-path tree)</p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A* search (<code>a_star_search</code>, point-to-point; optional admissible heuristic)</p>
 </li>
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Bellman-Ford (<code>bellman_ford</code>, negative weights)</p>
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Bellman-Ford (<code>bellman_ford</code>, negative weights, integer lengths - see item 10) and <code>bellman_ford_tree</code></p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>shortest_paths()</code> - result object with distances, paths, predecessors, and reachability; picks Dijkstra or Bellman-Ford automatically</p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Unweighted BFS distances (<code>bfs_distances</code>, single-source)</p>
@@ -822,7 +1066,7 @@
 <h3 id="spanning-trees-flow-cut">Spanning trees, flow, cut<a class="headerlink" href="#spanning-trees-flow-cut" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>min_spanning_tree</code> (Prim), <code>make_minimum_spanning_tree</code> (Kruskal)</p>
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>min_spanning_tree</code> (Kruskal; a spanning forest on disconnected input), <code>make_minimum_spanning_tree</code> (Kruskal)</p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>max_flow</code> (Goldberg-Tarjan)</p>
@@ -837,7 +1081,7 @@
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Min-cost flow (<code>min_cost_flow</code>, Reinelt)</p>
 </li>
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> s-t min cut, directed or undirected (<code>min_st_cut</code>, returns value and cut edges; companion to global <code>min_cut</code> + <code>max_flow</code>)</p>
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> s-t min cut, directed or undirected (<code>min_st_cut</code> returns an <code>STCut(value, edges)</code>; <code>st_cut</code> is the low-level form). Companion to global <code>min_cut</code> + <code>max_flow</code>. The node partition is not reported - see item 10</p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Nagamochi-Ibaraki min cut</p>
@@ -976,11 +1220,137 @@
 <p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> TikZ (<code>draw_tikz</code> / <code>to_tikz</code>)</p>
 </li>
 </ul>
+<h2 id="python-layer">Python layer<a class="headerlink" href="#python-layer" title="Permanent link">&para;</a></h2>
+<p>Not bindings of OGDF classes, but the API that makes the binding usable from Python. Covered in depth in <a href="../getting-started/">Getting Started</a>.</p>
+<h3 id="diagnostics">Diagnostics<a class="headerlink" href="#diagnostics" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>about()</code> / <code>about_text()</code> / <code>python -m ogdf</code> - package and OGDF versions, the pinned OGDF tag the linked libraries were built from, OGDF's compiled-in configuration, platform, compiler, and available capabilities</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>build_info()</code> - the compiled-in half of the above</p>
+</li>
+</ul>
+<h3 id="errors-and-preconditions">Errors and preconditions<a class="headerlink" href="#errors-and-preconditions" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Exception taxonomy: <code>OGDFError</code>, <code>PreconditionError</code>, <code>InvalidGraphError</code>, <code>UnsupportedFormatError</code>, <code>AlgorithmError</code> (the argument-shaped ones also subclass <code>ValueError</code>, <code>AlgorithmError</code> subclasses <code>RuntimeError</code>)</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Enforcement of every documented precondition before entering OGDF, whose assertions are compiled out of a release build</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Argument checks: arrays belonging to another graph, <code>None</code> nodes, negative weights where non-negative is assumed, source equal to sink</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>requirements()</code>, <code>validate()</code>, <code>is_valid_for()</code>, <code>check()</code>, <code>operations()</code>, <code>graph_report()</code></p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Transactional guarantees for mutating operations that fail partway (currently: preconditions are checked up front, so the mutators either run or do not start)</p>
+</li>
+</ul>
+<h3 id="interoperability">Interoperability<a class="headerlink" href="#interoperability" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>from_edges</code> / <code>to_edges</code> (edge lists, with a caller-supplied key mapping)</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>from_networkx</code> / <code>to_networkx</code> (all four NetworkX classes; directedness, multiedges, node identity, and layout coordinates handled explicitly). NetworkX is an optional dependency, imported lazily</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Arrays to and from Python containers: <code>node_array_to_dict</code>, <code>edge_array_to_dict</code>, <code>node_array_to_list</code>, <code>edge_array_to_list</code>, <code>fill_node_array</code>, <code>fill_edge_array</code></p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Results as ordinary collections: <code>nodes_where</code>, <code>edges_where</code></p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> igraph adapters (bind on demand)</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> pandas / polars node and edge tables</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> NumPy views over <code>NodeArray</code> / <code>EdgeArray</code> without a copy</p>
+</li>
+</ul>
+<h3 id="reproducibility">Reproducibility<a class="headerlink" href="#reproducibility" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>set_seed</code>, <code>get_seed</code>, <code>new_seed</code>, and the <code>seeded(n)</code> context manager over OGDF's process-wide random engine (<code>seed_random_engine</code>, <code>draw_random_seed</code>)</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>provenance(**settings)</code> - JSON-serializable metadata recording seed, versions, platform, and algorithm settings</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Achieved objective values from the heuristic layouts, so runs and seeds can be compared numerically</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A serializable "layout recipe" (graph hash + algorithm + options + seed + versions + output metrics)</p>
+</li>
+</ul>
+<h3 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Result objects with named fields, alongside the array-output form, which stays the bulk-calling path: <code>ShortestPaths</code> (distances, paths, predecessors, reachability) and <code>STCut</code> (value and cut edges)</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>shortest_paths()</code> picks Dijkstra or Bellman-Ford automatically and reports unreachability as <code>math.inf</code> / <code>None</code> rather than OGDF's raw sentinel</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Result objects for the remaining array-output algorithms (matching, colouring, components)</p>
+</li>
+</ul>
+<h3 id="placing-a-drawing">Placing a drawing<a class="headerlink" href="#placing-a-drawing" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Coordinate transforms: <code>normalize</code>, <code>center</code>, <code>translate</code>, <code>scale</code>, <code>fit_to_box</code>, <code>pack_components</code> (the last binding OGDF's <code>TileToRowsCCPacker</code>). All move edge bends as well as node coordinates</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Low-level forms, if you need them: <code>translate_drawing</code>, <code>scale_drawing</code>, <code>fit_scale</code>, <code>tile_components</code></p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Rotation and reflection</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Per-component transforms (fit each component to its own box)</p>
+</li>
+</ul>
+<h3 id="measuring-a-drawing">Measuring a drawing<a class="headerlink" href="#measuring-a-drawing" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>count_crossings</code>, <code>edge_lengths</code>, <code>bounding_box</code>, <code>node_overlaps</code>, <code>min_angle</code> (angular resolution), <code>stress</code> - all computed over the drawn polylines, so bends count</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>drawing_metrics()</code> aggregates them into one serializable dict; <code>compare_layouts()</code> runs several layouts and ranks them</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Edge-edge and node-edge distance, symmetry, and orthogonality metrics</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A benchmark runner recording runtime and memory alongside the metrics</p>
+</li>
+</ul>
+<h3 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>layout(graph, algorithm=FMMMLayout, **options)</code> - preconditions, seeding, the layout, packing, and fit-to-box in one call. The algorithm is a class by default so it stays type-checked; a string is accepted for config-driven use, and <code>layout_names()</code> lists what resolves</li>
+</ul>
+<h3 id="not-yet-provided">Not yet provided<a class="headerlink" href="#not-yet-provided" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Themes, palettes, and style-by-attribute helpers</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Notebook / interactive HTML output beyond the SVG string</p>
+</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A CLI for converting, laying out, and rendering graph files</p>
+</li>
+</ul>
 <h2 id="excluded-subsystems">Excluded subsystems<a class="headerlink" href="#excluded-subsystems" title="Permanent link">&para;</a></h2>
 <p>Whole OGDF modules that are out of scope for the current curated subset:</p>
 <ul class="task-list">
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Clustered graphs and cluster planarity / layout</p>
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Clustered graphs (<code>ClusterGraph</code>, <code>ClusterGraphAttributes</code>) and cluster planarity / layout</p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> UML diagram support</p>
@@ -995,10 +1365,10 @@
 <p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Simultaneous embedding (SEFE) / SyncPlan</p>
 </li>
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Augmentation (planarity / connectivity augmentation)</p>
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Planarity augmentation (connectivity augmentation is bound: <code>make_connected</code>, <code>make_biconnected</code>)</p>
 </li>
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Rectangle / component packing</p>
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> General rectangle packing (connected components are packed by <code>pack_components</code> / <code>tile_components</code>)</p>
 </li>
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> LP solver (COIN) interface</p>
