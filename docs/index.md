@@ -56,10 +56,15 @@ ogdf.draw_svg(ga, "graph.svg")
 ## Where to go next
 
 - [Getting Started](getting-started.md) - installation, the graph model, interoperability, errors, and reproducibility.
+
 - [Choosing a Layout](choosing-a-layout.md) - which of the twenty-two layouts fits your graph, and why.
+
 - [Recipes](recipes.md) - four complete workflows, from NetworkX to SVG to annotated drawings.
+
 - [Drawing Metrics](metrics.md) - measure and compare layouts on numbers rather than by eye.
+
 - [Gallery](gallery.md) - example drawings.
+
 - [Coverage](coverage.md) - exactly what is and is not included.
 
 Run `python -m ogdf` to print an installation report (versions, platform, capabilities) for a bug report.

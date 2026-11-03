@@ -296,8 +296,7 @@ Highest-value gaps given the drawing + planarity focus and the common-algorithm 
 
 ## Python layer
 
-Not bindings of OGDF classes, but the API that makes the binding usable from
-Python. Covered in depth in [Getting Started](getting-started.md).
+Not bindings of OGDF classes, but the API that makes the binding usable from Python. Covered in depth in [Getting Started](getting-started.md).
 
 ### Diagnostics
 

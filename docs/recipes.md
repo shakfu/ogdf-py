@@ -1,12 +1,10 @@
 # Recipes
 
-Four complete workflows, each runnable end to end. Every one is exercised by
-the test suite (`tests/test_recipes.py`), so they stay correct.
+Four complete workflows, each runnable end to end. Every one is exercised by the test suite (`tests/test_recipes.py`), so they stay correct.
 
 ## 1. NetworkX to SVG
 
-Take a graph you already have in NetworkX, lay it out with OGDF, and write a
-styled SVG.
+Take a graph you already have in NetworkX, lay it out with OGDF, and write a styled SVG.
 
 ```python
 import networkx as nx
@@ -37,8 +35,7 @@ with ogdf.seeded(20260831):
 ogdf.draw_svg(ga, "lesmis.svg")
 ```
 
-`ogdf.to_svg(ga)` returns the same SVG as a string, which is what to use in a
-notebook (`IPython.display.SVG(ogdf.to_svg(ga))`).
+`ogdf.to_svg(ga)` returns the same SVG as a string, which is what to use in a notebook (`IPython.display.SVG(ogdf.to_svg(ga))`).
 
 To go back the other way and plot with NetworkX instead:
 
@@ -84,9 +81,7 @@ print("crossings:", layout.number_of_crossings(),
 ogdf.draw_svg(ga, "dependencies.svg")
 ```
 
-The build order comes from the same graph. An edge points from a component to
-what it depends on, so a valid build order is the *reverse* topological
-numbering - dependencies first:
+The build order comes from the same graph. An edge points from a component to what it depends on, so a valid build order is the *reverse* topological numbering - dependencies first:
 
 ```python
 order = ogdf.NodeArrayInt(g)
@@ -126,8 +121,7 @@ with open("planar.tex", "w") as f:
     f.write(ogdf.to_tikz(ga))
 ```
 
-Verify the promise rather than trusting it - a planar graph drawn by a planar
-layout should have no crossings at all:
+Verify the promise rather than trusting it - a planar graph drawn by a planar layout should have no crossings at all:
 
 ```python
 assert ogdf.crossing_number(g) == 0
@@ -135,8 +129,7 @@ assert ogdf.crossing_number(g) == 0
 
 ## 4. Weighted graph to an annotated drawing
 
-Compute a result, then render it. Here: a minimum spanning tree, highlighted on
-top of the full graph.
+Compute a result, then render it. Here: a minimum spanning tree, highlighted on top of the full graph.
 
 ```python
 import ogdf
@@ -175,6 +168,4 @@ ogdf.FMMMLayout().call(ga)
 ogdf.draw_svg(ga, "mst.svg")
 ```
 
-The same shape works for any array-valued result: run the algorithm, turn the
-array into a list with `ogdf.edges_where` / `ogdf.nodes_where`, and style from
-it.
+The same shape works for any array-valued result: run the algorithm, turn the array into a list with `ogdf.edges_where` / `ogdf.nodes_where`, and style from it.

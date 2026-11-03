@@ -74,13 +74,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Inputs that broke an OGDF precondition now raise `PreconditionError` or `InvalidGraphError` instead of segfaulting, hanging, or returning a wrong result. OGDF checks its preconditions only in debug builds. Findings C1-C14 and P1 in `REVIEW.md` list each case; `tests/test_safety.py` covers them. The main classes:
   - `GraphAttributes` accessors, layouts, metrics, transforms and SVG/TikZ output check the attribute flags they read. A default `GraphAttributes` segfaulted on `set_node_label`.
+
   - A handle whose element was deleted, or whose graph was cleared or destroyed, is rejected with a `TypeError` (and a nanobind `RuntimeWarning`) instead of reading freed memory. If OGDF later reuses the address for a new element of the same kind, the old handle names that element. A side table keyed by address made array access and generators 3x slower, because each lookup missed the cache; marking the Python object invalid costs nothing per access.
+
   - Arrays, `GraphAttributes`, and node/edge arguments from a different graph are rejected. `connected_components` with another graph's array returned 16 for a 200000-node graph and wrote out of bounds.
+
   - `FPPLayout`, `MixedModelLayout`, `SchnyderLayout`, `DominanceLayout` and `VisibilityLayout` require a connected graph, and `validate()` reports it. `validate()` returned `[]` for inputs that then segfaulted.
+
   - Generators validate sizes, degrees, probabilities and parity, and reject aliased graph arguments. Impossible `random_regular_graph` and `random_watts_strogatz_graph` arguments looped forever; `cube_graph(g, 40)` overflowed to 256 nodes.
+
   - `planar_embed_planar_graph` rejects non-planar input; on K5 it added two nodes and marked the result embedded.
+
   - `min_cost_flow` checks connectivity, bounds and supply balance, and verifies OGDF's result. OGDF's Reinelt solver reports success with zero flow on a one-edge network; that now raises `AlgorithmError`.
+
   - `bellman_ford` no longer relaxes edges out of unreachable nodes. OGDF added edge lengths to its `INT_MAX` sentinel, which overflowed and gave every node downstream of an unreachable one a wrong distance. Lengths whose absolute sum reaches `2**31 - 1` are rejected.
+
   - NaN weights and capacities are rejected wherever negative ones were. `PivotMDS.set_edge_costs(0)` (an endless loop) and `SugiyamaLayout.set_runs(0)` are rejected.
 
 - `make clean` deleted every `.so` under the repository, including the 241 in `.venv`. It now cleans `src/` only.

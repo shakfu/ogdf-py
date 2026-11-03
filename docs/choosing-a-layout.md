@@ -1,9 +1,6 @@
 # Choosing a Layout
 
-The package exposes twenty-two layouts. Which one to use is decided almost
-entirely by the *structure* of your graph, because most of them refuse - or
-quietly mislead - on input they were not designed for. Start from the structure,
-then narrow by scale and by what the drawing is for.
+The package exposes twenty-two layouts. Which one to use is decided almost entirely by the *structure* of your graph, because most of them refuse - or quietly mislead - on input they were not designed for. Start from the structure, then narrow by scale and by what the drawing is for.
 
 ## Start here
 
@@ -27,47 +24,25 @@ then narrow by scale and by what the drawing is for.
 
 ## By constraint
 
-**Preconditions are enforced.** Every layout above with a structural
-requirement checks it and raises `InvalidGraphError` rather than producing a
-broken drawing. Ask first with `ogdf.validate("TutteLayout", g)` or
-`ogdf.graph_report(g)` - see [Errors and preconditions](getting-started.md#errors-and-preconditions).
+**Preconditions are enforced.** Every layout above with a structural requirement checks it and raises `InvalidGraphError` rather than producing a broken drawing. Ask first with `ogdf.validate("TutteLayout", g)` or `ogdf.graph_report(g)` - see [Errors and preconditions](getting-started.md#errors-and-preconditions).
 
-**Directedness.** OGDF stores every edge with a source and a target, but only
-some layouts *read* the direction. `SugiyamaLayout`, `DominanceLayout`,
-`VisibilityLayout`, and the tree layouts do; the force-directed, stress, planar,
-and circular layouts do not. Set `attributes.directed = True` so the drawing
-writers render arrowheads.
+**Directedness.** OGDF stores every edge with a source and a target, but only some layouts *read* the direction. `SugiyamaLayout`, `DominanceLayout`, `VisibilityLayout`, and the tree layouts do; the force-directed, stress, planar, and circular layouts do not. Set `attributes.directed = True` so the drawing writers render arrowheads.
 
-**Disconnected graphs.** `FMMMLayout`, `MultilevelLayout`, `SugiyamaLayout`
-(with `set_arrange_ccs(True)`), and `TreeLayout` place components separately.
-`SpringEmbedderKK` and `BalloonLayout` require a connected graph and say so.
-`StressMinimization` needs `set_layout_components_separately(True)`.
+**Disconnected graphs.** `FMMMLayout`, `MultilevelLayout`, `SugiyamaLayout` (with `set_arrange_ccs(True)`), and `TreeLayout` place components separately. `SpringEmbedderKK` and `BalloonLayout` require a connected graph and say so. `StressMinimization` needs `set_layout_components_separately(True)`.
 
-**Multigraphs and self-loops.** The planar grid layouts require a *simple*
-graph - no self-loops, no parallel edges - in the undirected sense. "Planar" for
-a multigraph is decided on its underlying simple graph, so a graph that
-`is_planar` reports as planar can still be rejected as non-simple. Check with
-`ogdf.is_simple_undirected(g)` and `ogdf.has_self_loops(g)`.
+**Multigraphs and self-loops.** The planar grid layouts require a *simple* graph - no self-loops, no parallel edges - in the undirected sense. "Planar" for a multigraph is decided on its underlying simple graph, so a graph that `is_planar` reports as planar can still be rejected as non-simple. Check with `ogdf.is_simple_undirected(g)` and `ogdf.has_self_loops(g)`.
 
-**Scale.** Below a few thousand nodes, `FMMMLayout` is fast enough and looks
-best. Above that, use `MultilevelLayout`. `StressMinimization` and
-`SpringEmbedderKK` are quadratic-ish in practice and get slow first.
+**Scale.** Below a few thousand nodes, `FMMMLayout` is fast enough and looks best. Above that, use `MultilevelLayout`. `StressMinimization` and `SpringEmbedderKK` are quadratic-ish in practice and get slow first.
 
-**Determinism.** The force-directed and multilevel layouts are randomized. Seed
-them with `ogdf.seeded(n)` and record `ogdf.provenance()` - see
-[Reproducibility](getting-started.md#reproducibility). The tree, planar, and
-upward layouts are deterministic given a fixed graph and embedding.
+**Determinism.** The force-directed and multilevel layouts are randomized. Seed them with `ogdf.seeded(n)` and record `ogdf.provenance()` - see [Reproducibility](getting-started.md#reproducibility). The tree, planar, and upward layouts are deterministic given a fixed graph and embedding.
 
 ## By output
 
-- **Publication figures (SVG/TikZ).** Planar layouts and `SugiyamaLayout` give
-  the most legible static drawings. Enable `ogdf.ALL_ATTRIBUTES` and set node
-  sizes before laying out - most layouts respect node dimensions.
-- **Notebook exploration.** `FMMMLayout` plus `ogdf.to_svg(ga)` renders inline
-  with no temporary files.
-- **Handing coordinates to another plotter.** Any layout, then
-  `ogdf.to_networkx(g, ga)` for a `pos` dict - see
-  [Python interoperability](getting-started.md#python-interoperability).
+- **Publication figures (SVG/TikZ).** Planar layouts and `SugiyamaLayout` give the most legible static drawings. Enable `ogdf.ALL_ATTRIBUTES` and set node sizes before laying out - most layouts respect node dimensions.
+
+- **Notebook exploration.** `FMMMLayout` plus `ogdf.to_svg(ga)` renders inline with no temporary files.
+
+- **Handing coordinates to another plotter.** Any layout, then `ogdf.to_networkx(g, ga)` for a `pos` dict - see [Python interoperability](getting-started.md#python-interoperability).
 
 ## Comparing candidates
 
@@ -93,12 +68,8 @@ for row in ogdf.compare_layouts(g, {
               f"stress={row['stress']:.3f} area={row['area']:.0f}")
 ```
 
-Results come back best-first, ranked by crossings then stress. A layout whose
-preconditions this graph fails is reported with an `error` key rather than
-raising, so you can throw every candidate at a graph and see what sticks. Pass
-`seed` so the randomized layouts are compared like for like.
+Results come back best-first, ranked by crossings then stress. A layout whose preconditions this graph fails is reported with an `error` key rather than raising, so you can throw every candidate at a graph and see what sticks. Pass `seed` so the randomized layouts are compared like for like.
 
-`ogdf.crossing_number(g, permutations=8)` gives a heuristic reference point to
-compare those crossing counts against - no drawing can do better.
+`ogdf.crossing_number(g, permutations=8)` gives a heuristic reference point to compare those crossing counts against - no drawing can do better.
 
 See [Drawing quality metrics](metrics.md) for what each number means.
